@@ -12,7 +12,7 @@ from .ast import (
     CompoundAssignment, LetDeclaration, IfStatement, WhileLoop,
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
-    MemberAccess, StructDef, StructField
+    MemberAccess, StructDef, StructField, StructInstance
 )
 
 
@@ -53,6 +53,20 @@ class Parser:
     def match(self, *types: TokenType) -> bool:
         """Check if current token is one of the given types."""
         return self.current().type in types
+
+    def is_struct_instance_start(self) -> bool:
+        """Check if current position starts a struct instantiation.
+
+        Looks for pattern: { identifier : ...
+        This distinguishes struct literals from blocks.
+        """
+        if not self.match(TokenType.LBRACE):
+            return False
+        next_token = self.peek(1)
+        if next_token.type != TokenType.IDENTIFIER:
+            return False
+        after_ident = self.peek(2)
+        return after_ident.type == TokenType.COLON
 
     def parse(self) -> Program:
         """Parse the entire program."""
@@ -215,6 +229,25 @@ class Parser:
 
         self.eat(TokenType.RBRACE)
         return StructDef(name, fields)
+
+    def parse_struct_instance(self, struct_name: str) -> StructInstance:
+        """Parse struct instantiation: Name { field: value, ... }"""
+        self.eat(TokenType.LBRACE)
+        self.skip_newlines()
+
+        field_values = {}
+        while not self.match(TokenType.RBRACE):
+            field_name = self.eat(TokenType.IDENTIFIER).value
+            self.eat(TokenType.COLON)
+            field_value = self.parse_expression()
+            field_values[field_name] = field_value
+
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+            self.skip_newlines()
+
+        self.eat(TokenType.RBRACE)
+        return StructInstance(struct_name, field_values)
 
     def parse_block(self) -> list:
         """Parse a block { ... }."""
@@ -424,6 +457,8 @@ class Parser:
 
         elif t.type == TokenType.IDENTIFIER:
             self.pos += 1
+            if self.match(TokenType.LBRACE) and self.is_struct_instance_start():
+                return self.parse_struct_instance(t.value)
             return Identifier(t.value)
 
         elif t.type == TokenType.LPAREN:
