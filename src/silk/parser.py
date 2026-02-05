@@ -60,13 +60,21 @@ class Parser:
 
         Looks for pattern: { identifier : ...
         This distinguishes struct literals from blocks.
+        Handles newlines after the opening brace.
         """
         if not self.match(TokenType.LBRACE):
             return False
-        next_token = self.peek(1)
+        # Skip newlines when peeking
+        offset = 1
+        while self.peek(offset).type == TokenType.NEWLINE:
+            offset += 1
+        next_token = self.peek(offset)
         if next_token.type != TokenType.IDENTIFIER:
             return False
-        after_ident = self.peek(2)
+        offset += 1
+        while self.peek(offset).type == TokenType.NEWLINE:
+            offset += 1
+        after_ident = self.peek(offset)
         return after_ident.type == TokenType.COLON
 
     def parse(self) -> Program:

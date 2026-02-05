@@ -1,0 +1,82 @@
+// Patient Assessment with Silk Type System
+// Demonstrates: struct, enum, match with exhaustiveness, Result type
+
+struct Patient {
+    id: str,
+    name: str,
+    age: int,
+    weight: float,
+    height: float
+}
+
+enum BMICategory {
+    Underweight,
+    Normal,
+    Overweight,
+    Obese
+}
+
+fn classify_bmi(bmi_value: float) -> BMICategory {
+    return match bmi_value {
+        _ if bmi_value < 18.5 => Underweight,
+        _ if bmi_value < 25.0 => Normal,
+        _ if bmi_value < 30.0 => Overweight,
+        _ => Obese
+    }
+}
+
+fn safe_dose(mg_per_kg: float, weight: float) {
+    if weight <= 0 {
+        return Err("Invalid weight: must be positive")
+    }
+    if mg_per_kg <= 0 {
+        return Err("Invalid dosage: must be positive")
+    }
+    return Ok(mg_per_kg * weight)
+}
+
+// Main program
+let patient = Patient {
+    id: "P001",
+    name: "Ahmad",
+    age: 8,
+    weight: 25.0,
+    height: 1.20
+}
+
+print("=== Patient Assessment ===")
+print("Patient: " + patient.name)
+print("Age: " + str(patient.age) + " years")
+print("Weight: " + str(patient.weight) + " kg")
+print("Height: " + str(patient.height) + " m")
+
+let bmi_value = bmi(patient.weight, patient.height)
+print("BMI: " + str(bmi_value))
+
+// Exhaustive match - all variants MUST be covered
+match classify_bmi(bmi_value) {
+    Underweight => print("Status: Consider nutritional support"),
+    Normal => print("Status: Healthy weight"),
+    Overweight => print("Status: Recommend lifestyle changes"),
+    Obese => print("Status: Medical intervention needed")
+}
+
+print("")
+print("=== Medication Dosing ===")
+
+// Amoxicillin: 15 mg/kg
+let amox_dose = safe_dose(15.0, patient.weight)
+match amox_dose {
+    Ok(dose) => print("Amoxicillin: " + str(dose) + " mg"),
+    Err(e) => print("Error: " + e)
+}
+
+// Ibuprofen: 10 mg/kg
+let ibu_dose = safe_dose(10.0, patient.weight)
+match ibu_dose {
+    Ok(dose) => print("Ibuprofen: " + str(dose) + " mg"),
+    Err(e) => print("Error: " + e)
+}
+
+print("")
+print("Note: Dosages require clinical interpretation.")

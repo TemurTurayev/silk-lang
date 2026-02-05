@@ -277,6 +277,10 @@ class Interpreter:
             variant_names = [v.name for v in node.variants]
             enum_info = ('enum_def', node.name, variant_names)
             env.define(node.name, enum_info, mutable=False)
+            # Register each variant as an accessible value
+            for variant in node.variants:
+                variant_value = SilkEnumValue(node.name, variant.name)
+                env.define(variant.name, variant_value, mutable=False)
 
         else:
             # Expression statement
@@ -490,23 +494,28 @@ class Interpreter:
 
         # Find matching arm
         for arm in node.arms:
-            if self._pattern_matches(value, arm.pattern, env):
+            bindings = {}
+            if self._pattern_matches(value, arm.pattern, env, bindings):
                 # Check guard if present
                 if arm.guard is not None:
                     guard_result = self.evaluate(arm.guard, env)
                     if not _truthy(guard_result):
                         continue
 
+                # Create environment with pattern bindings
+                match_env = Environment(parent=env)
+                for name, val in bindings.items():
+                    match_env.define(name, val, mutable=False)
+
                 # Execute body
                 if isinstance(arm.body, list):
                     # Block body
-                    match_env = Environment(parent=env)
                     for stmt in arm.body:
                         self.execute(stmt, match_env)
                     return None
                 else:
                     # Expression body
-                    return self.evaluate(arm.body, env)
+                    return self.evaluate(arm.body, match_env)
 
         raise RuntimeError_(f"No matching pattern for value: {value}")
 
@@ -545,8 +554,13 @@ class Interpreter:
                 f"Add missing cases or use '_' wildcard."
             )
 
-    def _pattern_matches(self, value: Any, pattern: Any, env: Environment) -> bool:
-        """Check if value matches pattern."""
+    def _pattern_matches(
+        self, value: Any, pattern: Any, env: Environment, bindings: dict | None = None
+    ) -> bool:
+        """Check if value matches pattern, optionally extracting bindings."""
+        if bindings is None:
+            bindings = {}
+
         if isinstance(pattern, Identifier):
             if pattern.name == '_':
                 return True  # Wildcard matches everything
@@ -569,6 +583,36 @@ class Interpreter:
 
         if isinstance(pattern, BoolLiteral):
             return value == pattern.value
+
+        if isinstance(pattern, FunctionCall):
+            # Pattern like Ok(var) or Err(var) or Some(var)
+            # pattern.name can be Identifier or a string depending on parsing
+            pattern_name = pattern.name.name if isinstance(pattern.name, Identifier) else pattern.name
+            if isinstance(value, SilkResult):
+                if pattern_name == 'Ok' and value.is_ok:
+                    if pattern.args and len(pattern.args) == 1:
+                        arg = pattern.args[0]
+                        if isinstance(arg, Identifier):
+                            bindings[arg.name] = value.value
+                    return True
+                if pattern_name == 'Err' and not value.is_ok:
+                    if pattern.args and len(pattern.args) == 1:
+                        arg = pattern.args[0]
+                        if isinstance(arg, Identifier):
+                            bindings[arg.name] = value.error
+                    return True
+                return False
+            if isinstance(value, SilkOption):
+                if pattern_name == 'Some' and value.is_some:
+                    if pattern.args and len(pattern.args) == 1:
+                        arg = pattern.args[0]
+                        if isinstance(arg, Identifier):
+                            bindings[arg.name] = value.value
+                    return True
+                if pattern_name == 'None' and not value.is_some:
+                    return True
+                return False
+            return False
 
         return False
 
