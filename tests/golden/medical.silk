@@ -1,0 +1,4 @@
+let weight = 70.0
+let height = 1.75
+let result = bmi(weight, height)
+print(result)
