@@ -195,3 +195,224 @@ class TestMedicalFunctions:
 
     def test_median_even(self, evaluate_silk):
         assert evaluate_silk("median([1, 2, 3, 4])") == 2.5
+
+
+class TestBuiltinFunctions:
+    """Test built-in functions for coverage."""
+
+    def test_type_int(self, interp):
+        interp.run('print(type(42))')
+        assert interp.output_lines[-1] == "int"
+
+    def test_type_str(self, interp):
+        interp.run('print(type("hello"))')
+        assert interp.output_lines[-1] == "str"
+
+    def test_type_float(self, interp):
+        interp.run('print(type(3.14))')
+        assert interp.output_lines[-1] == "float"
+
+    def test_type_bool(self, interp):
+        interp.run('print(type(true))')
+        assert interp.output_lines[-1] == "bool"
+
+    def test_type_array(self, interp):
+        interp.run('print(type([1, 2, 3]))')
+        assert interp.output_lines[-1] == "array"
+
+    def test_str_conversion(self, interp):
+        interp.run('print(str(42))')
+        assert interp.output_lines[-1] == "42"
+
+    def test_int_conversion(self, interp):
+        interp.run('print(int("42"))')
+        assert interp.output_lines[-1] == "42"
+
+    def test_float_conversion(self, interp):
+        interp.run('print(float("3.14"))')
+        assert interp.output_lines[-1] == "3.14"
+
+    def test_bool_conversion_truthy(self, interp):
+        interp.run('print(bool(1))')
+        assert interp.output_lines[-1] == "true"
+
+    def test_bool_conversion_falsy(self, interp):
+        interp.run('print(bool(0))')
+        assert interp.output_lines[-1] == "false"
+
+    def test_len_array(self, interp):
+        interp.run('print(len([1, 2, 3]))')
+        assert interp.output_lines[-1] == "3"
+
+    def test_len_string(self, interp):
+        interp.run('print(len("hello"))')
+        assert interp.output_lines[-1] == "5"
+
+    def test_range_basic(self, interp):
+        interp.run('print(range(5))')
+        assert "[0, 1, 2, 3, 4]" in interp.output_lines[-1]
+
+    def test_range_start_end(self, interp):
+        interp.run('print(range(2, 5))')
+        assert "[2, 3, 4]" in interp.output_lines[-1]
+
+    def test_push(self, interp):
+        interp.run('let mut arr = [1, 2]\npush(arr, 3)\nprint(arr)')
+        assert "[1, 2, 3]" in interp.output_lines[-1]
+
+    def test_pop(self, interp):
+        interp.run('let mut arr = [1, 2, 3]\nlet x = pop(arr)\nprint(x)')
+        assert interp.output_lines[-1] == "3"
+
+    def test_slice(self, interp):
+        interp.run('print(slice([1, 2, 3, 4], 1, 3))')
+        assert "[2, 3]" in interp.output_lines[-1]
+
+    def test_reverse(self, interp):
+        interp.run('print(reverse([1, 2, 3]))')
+        assert "[3, 2, 1]" in interp.output_lines[-1]
+
+    def test_sort(self, interp):
+        interp.run('print(sort([3, 1, 2]))')
+        assert "[1, 2, 3]" in interp.output_lines[-1]
+
+    def test_join(self, interp):
+        interp.run('print(join(["a", "b", "c"], "-"))')
+        assert interp.output_lines[-1] == "a-b-c"
+
+    def test_split(self, interp):
+        interp.run('print(split("a-b-c", "-"))')
+        assert "[a, b, c]" in interp.output_lines[-1]
+
+    def test_contains_true(self, interp):
+        interp.run('print(contains([1, 2, 3], 2))')
+        assert interp.output_lines[-1] == "true"
+
+    def test_contains_false(self, interp):
+        interp.run('print(contains([1, 2, 3], 5))')
+        assert interp.output_lines[-1] == "false"
+
+
+class TestMathFunctions:
+    """Test math functions."""
+
+    def test_abs_positive(self, interp):
+        interp.run('print(abs(5))')
+        assert interp.output_lines[-1] == "5"
+
+    def test_abs_negative(self, interp):
+        interp.run('print(abs(-5))')
+        assert interp.output_lines[-1] == "5"
+
+    def test_round(self, interp):
+        interp.run('print(round(3.7))')
+        assert interp.output_lines[-1] == "4"
+
+    def test_min(self, interp):
+        interp.run('print(min(3, 1, 4, 1, 5))')
+        assert interp.output_lines[-1] == "1"
+
+    def test_max(self, interp):
+        interp.run('print(max(3, 1, 4, 1, 5))')
+        assert interp.output_lines[-1] == "5"
+
+    def test_sum(self, interp):
+        interp.run('print(sum([1, 2, 3, 4]))')
+        assert interp.output_lines[-1] == "10"
+
+    def test_sqrt(self, interp):
+        interp.run('print(sqrt(16))')
+        assert interp.output_lines[-1] == "4"
+
+    def test_pow(self, interp):
+        interp.run('print(pow(2, 3))')
+        assert interp.output_lines[-1] == "8"
+
+    def test_ceil(self, interp):
+        interp.run('print(ceil(3.2))')
+        assert interp.output_lines[-1] == "4"
+
+    def test_floor(self, interp):
+        interp.run('print(floor(3.8))')
+        assert interp.output_lines[-1] == "3"
+
+
+class TestMedicalFunctionsExtended:
+    """Test medical calculation functions."""
+
+    def test_bmi(self, interp):
+        interp.run('print(bmi(70, 1.75))')
+        assert "22.86" in interp.output_lines[-1]
+
+    def test_bsa(self, interp):
+        interp.run('print(bsa(70, 175))')
+        # DuBois formula
+        assert float(interp.output_lines[-1]) > 1.8
+
+    def test_ideal_body_weight_male(self, interp):
+        interp.run('print(ideal_body_weight(180, true))')
+        assert float(interp.output_lines[-1]) > 70
+
+    def test_ideal_body_weight_female(self, interp):
+        interp.run('print(ideal_body_weight(165, false))')
+        assert float(interp.output_lines[-1]) > 50
+
+    def test_dose_per_kg(self, interp):
+        interp.run('print(dose_per_kg(15, 25))')
+        assert interp.output_lines[-1] == "375"
+
+    def test_celsius_to_fahrenheit(self, interp):
+        interp.run('print(celsius_to_fahrenheit(37))')
+        assert "98.6" in interp.output_lines[-1]
+
+    def test_fahrenheit_to_celsius(self, interp):
+        interp.run('print(fahrenheit_to_celsius(98.6))')
+        assert "37" in interp.output_lines[-1]
+
+    def test_mean(self, interp):
+        interp.run('print(mean([2, 4, 6, 8]))')
+        assert interp.output_lines[-1] == "5"
+
+    def test_median_odd(self, interp):
+        interp.run('print(median([1, 3, 5, 7, 9]))')
+        assert interp.output_lines[-1] == "5"
+
+    def test_median_even(self, interp):
+        interp.run('print(median([1, 2, 3, 4]))')
+        assert interp.output_lines[-1] == "2.5"
+
+
+class TestStringMethods:
+    """Test string methods."""
+
+    def test_upper(self, interp):
+        interp.run('print("hello".upper())')
+        assert interp.output_lines[-1] == "HELLO"
+
+    def test_lower(self, interp):
+        interp.run('print("HELLO".lower())')
+        assert interp.output_lines[-1] == "hello"
+
+    def test_strip(self, interp):
+        interp.run('print("  hello  ".strip())')
+        assert interp.output_lines[-1] == "hello"
+
+    def test_replace(self, interp):
+        interp.run('print("hello".replace("l", "L"))')
+        assert interp.output_lines[-1] == "heLLo"
+
+    def test_starts_with_true(self, interp):
+        interp.run('print("hello".starts_with("he"))')
+        assert interp.output_lines[-1] == "true"
+
+    def test_starts_with_false(self, interp):
+        interp.run('print("hello".starts_with("wo"))')
+        assert interp.output_lines[-1] == "false"
+
+    def test_ends_with_true(self, interp):
+        interp.run('print("hello".ends_with("lo"))')
+        assert interp.output_lines[-1] == "true"
+
+    def test_ends_with_false(self, interp):
+        interp.run('print("hello".ends_with("la"))')
+        assert interp.output_lines[-1] == "false"

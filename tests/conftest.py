@@ -39,6 +39,12 @@ def interpreter():
 
 
 @pytest.fixture
+def interp():
+    """Create a fresh interpreter for testing with run() and output_lines."""
+    return Interpreter()
+
+
+@pytest.fixture
 def run_silk():
     """Run Silk code and return interpreter."""
     def _run(source: str) -> Interpreter:
