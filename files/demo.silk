@@ -1,0 +1,131 @@
+// ╔══════════════════════════════════════════════════╗
+// ║        Welcome to Silk! 🧵                       ║
+// ║        Your first program                        ║
+// ╚══════════════════════════════════════════════════╝
+
+// ─── Variables ───
+let name = "Temur"
+let age = 22
+let mut score = 85.0
+
+print("👋 Hello, " + name + "!")
+print("Age: " + str(age) + ", Score: " + str(score))
+
+// Immutable vs Mutable
+score = 90.5  // OK — score is mutable
+print("Updated score: " + str(score))
+
+// ─── Functions ───
+fn factorial(n: int) -> int {
+    if n <= 1 {
+        return 1
+    }
+    return n * factorial(n - 1)
+}
+
+fn fibonacci(n: int) -> int {
+    if n <= 1 {
+        return n
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+fn greet(person: str, title: str) -> str {
+    return "Hello, " + title + " " + person + "! 🩺"
+}
+
+print("\n━━━ Functions ━━━")
+print("5! = " + str(factorial(5)))
+print("Fibonacci(10) = " + str(fibonacci(10)))
+print(greet("Turayev", "Dr."))
+
+// ─── Loops & Arrays ───
+print("\n━━━ Arrays & Loops ━━━")
+let mut numbers = [10, 25, 3, 47, 8, 15, 32]
+print("Original: " + str(numbers))
+print("Sorted: " + str(sort(numbers)))
+print("Length: " + str(len(numbers)))
+print("Sum: " + str(sum(numbers)))
+
+// For loop
+let mut squares = []
+for i in range(1, 8) {
+    push(squares, i ** 2)
+}
+print("Squares 1-7: " + str(squares))
+
+// While loop
+print("\n━━━ FizzBuzz (1-20) ━━━")
+let mut i = 1
+while i <= 20 {
+    if i % 15 == 0 {
+        print(str(i) + ": FizzBuzz")
+    } elif i % 3 == 0 {
+        print(str(i) + ": Fizz")
+    } elif i % 5 == 0 {
+        print(str(i) + ": Buzz")
+    }
+    i += 1
+}
+
+// ─── String Operations ───
+print("\n━━━ Strings ━━━")
+let message = "Silk Programming Language"
+print("Original: " + message)
+print("Upper: " + message.upper())
+print("Lower: " + message.lower())
+print("Length: " + str(message.length))
+print("Starts with 'Silk': " + str(message.starts_with("Silk")))
+
+// ─── Medical Functions ───
+print("\n━━━ Medical Calculator 🩺 ━━━")
+let weight = 70.0    // kg
+let height_m = 1.75  // meters
+let height_cm = 175.0 // cm
+
+print("Patient: " + name)
+print("Weight: " + str(weight) + " kg")
+print("Height: " + str(height_m) + " m")
+print("BMI: " + str(bmi(weight, height_m)))
+print("BSA (Du Bois): " + str(bsa(weight, height_cm)) + " m²")
+print("IBW (male): " + str(ideal_body_weight(height_cm, true)) + " kg")
+
+// Drug dosing example
+let dose_mg_per_kg = 15.0  // e.g., Amoxicillin
+let patient_weight = 25.0   // pediatric patient, kg
+print("\n━━━ Pediatric Dosing ━━━")
+print("Drug: Amoxicillin " + str(dose_mg_per_kg) + " mg/kg")
+print("Patient weight: " + str(patient_weight) + " kg")
+print("Total dose: " + str(dose_per_kg(dose_mg_per_kg, patient_weight)) + " mg")
+
+// ─── Statistics ───
+print("\n━━━ Statistics ━━━")
+let vitals = [36.6, 36.8, 37.1, 36.9, 36.5, 37.0, 36.7]
+print("Body temperatures: " + str(vitals))
+print("Mean: " + str(mean(vitals)) + "°C")
+print("Median: " + str(median(vitals)) + "°C")
+print("Std Dev: " + str(stdev(vitals)))
+
+// Temperature conversion
+let temp_f = 98.6
+print("\n" + str(temp_f) + "°F = " + str(fahrenheit_to_celsius(temp_f)) + "°C")
+
+// ─── Higher-Order Functions ───
+print("\n━━━ Functional Style ━━━")
+let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+fn is_even(n: int) -> bool {
+    return n % 2 == 0
+}
+
+fn double(n: int) -> int {
+    return n * 2
+}
+
+let evens = filter(is_even, data)
+let doubled = map(double, data)
+print("Data: " + str(data))
+print("Evens: " + str(evens))
+print("Doubled: " + str(doubled))
+
+print("\n✅ All examples completed successfully!")

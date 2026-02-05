@@ -1,0 +1,41 @@
+{
+  "name": "silk-lang",
+  "displayName": "Silk Language",
+  "description": "Syntax highlighting for the Silk programming language",
+  "version": "0.2.0",
+  "publisher": "silk-lang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "silk",
+    "medical",
+    "programming language",
+    "healthcare"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "silk",
+        "aliases": ["Silk", "silk"],
+        "extensions": [".silk"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "silk",
+        "scopeName": "source.silk",
+        "path": "./syntaxes/silk.tmLanguage.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TemurTurayev/silk-lang"
+  },
+  "license": "MIT"
+}

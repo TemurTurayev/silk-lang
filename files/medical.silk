@@ -1,0 +1,161 @@
+// ╔══════════════════════════════════════════════════╗
+// ║   Silk Medical Toolkit 🩺                        ║
+// ║   Pediatric Patient Assessment                   ║
+// ╚══════════════════════════════════════════════════╝
+
+// ─── Patient Data ───
+let patient_name = "Алиев Бобур"
+let age_years = 8
+let weight_kg = 25.0
+let height_cm = 128.0
+let temp_celsius = 37.8
+let heart_rate = 105
+let resp_rate = 22
+let systolic_bp = 100
+let diastolic_bp = 65
+
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("   PEDIATRIC ASSESSMENT REPORT")
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("Patient: " + patient_name)
+print("Age: " + str(age_years) + " years")
+print("Weight: " + str(weight_kg) + " kg")
+print("Height: " + str(height_cm) + " cm")
+
+// ─── Vitals Assessment ───
+print("\n📊 VITAL SIGNS:")
+print("  Temperature: " + str(temp_celsius) + "°C (" + str(celsius_to_fahrenheit(temp_celsius)) + "°F)")
+
+fn assess_temp(temp: float) -> str {
+    if temp < 36.0 {
+        return "⚠️ Hypothermia"
+    } elif temp <= 37.5 {
+        return "✅ Normal"
+    } elif temp <= 38.5 {
+        return "🟡 Low-grade fever"
+    } elif temp <= 39.5 {
+        return "🟠 Moderate fever"
+    } else {
+        return "🔴 High fever"
+    }
+}
+
+fn assess_hr(hr: int, age: int) -> str {
+    // Simplified pediatric heart rate ranges
+    if age >= 6 and age <= 12 {
+        if hr >= 70 and hr <= 120 {
+            return "✅ Normal for age"
+        } elif hr > 120 {
+            return "⚠️ Tachycardia"
+        } else {
+            return "⚠️ Bradycardia"
+        }
+    }
+    return "ℹ️ Check age-specific norms"
+}
+
+fn assess_rr(rr: int, age: int) -> str {
+    if age >= 6 and age <= 12 {
+        if rr >= 18 and rr <= 30 {
+            return "✅ Normal for age"
+        } elif rr > 30 {
+            return "⚠️ Tachypnea"
+        } else {
+            return "⚠️ Bradypnea"
+        }
+    }
+    return "ℹ️ Check age-specific norms"
+}
+
+print("  Status: " + assess_temp(temp_celsius))
+print("  Heart Rate: " + str(heart_rate) + " bpm — " + assess_hr(heart_rate, age_years))
+print("  Resp Rate: " + str(resp_rate) + "/min — " + assess_rr(resp_rate, age_years))
+print("  Blood Pressure: " + str(systolic_bp) + "/" + str(diastolic_bp) + " mmHg")
+
+// ─── Anthropometrics ───
+let height_m = height_cm / 100.0
+let patient_bmi = bmi(weight_kg, height_m)
+let patient_bsa = bsa(weight_kg, height_cm)
+
+print("\n📏 ANTHROPOMETRICS:")
+print("  BMI: " + str(patient_bmi) + " kg/m²")
+print("  BSA: " + str(patient_bsa) + " m²")
+
+fn assess_pediatric_bmi(bmi_val: float, age: int) -> str {
+    // Simplified — real assessment uses percentiles
+    if bmi_val < 14.0 {
+        return "⚠️ Underweight"
+    } elif bmi_val <= 18.0 {
+        return "✅ Normal range"
+    } elif bmi_val <= 21.0 {
+        return "🟡 Overweight"
+    } else {
+        return "🔴 Obese"
+    }
+}
+
+print("  BMI Status: " + assess_pediatric_bmi(patient_bmi, age_years))
+
+// ─── Drug Dosing Calculator ───
+print("\n💊 DRUG DOSING:")
+
+fn calculate_dose(drug_name: str, mg_per_kg: float, weight: float, doses_per_day: int) -> str {
+    let total_daily = dose_per_kg(mg_per_kg, weight)
+    let per_dose = round(total_daily / doses_per_day, 1)
+    return drug_name + ": " + str(total_daily) + " mg/day → " + str(per_dose) + " mg x " + str(doses_per_day) + "/day"
+}
+
+print("  " + calculate_dose("Amoxicillin", 50.0, weight_kg, 3))
+print("  " + calculate_dose("Ibuprofen", 10.0, weight_kg, 3))
+print("  " + calculate_dose("Paracetamol", 15.0, weight_kg, 4))
+print("  " + calculate_dose("Ceftriaxone", 50.0, weight_kg, 1))
+
+// ─── Lab Values Analysis ───
+print("\n🔬 LAB TRACKING:")
+let hemoglobin_series = [11.2, 10.8, 11.5, 12.0, 11.7]
+let wbc_series = [8.5, 12.3, 15.1, 10.2, 8.8]
+
+print("  Hemoglobin (g/dL): " + str(hemoglobin_series))
+print("    Mean: " + str(mean(hemoglobin_series)))
+print("    Trend: " + str(hemoglobin_series[0]) + " → " + str(hemoglobin_series[len(hemoglobin_series) - 1]))
+
+print("  WBC (x10³/µL): " + str(wbc_series))
+print("    Mean: " + str(mean(wbc_series)))
+print("    Peak: " + str(max(wbc_series)))
+
+// Check for abnormal values
+fn count_abnormal_wbc(values: array) -> int {
+    let mut count = 0
+    for v in values {
+        if v > 11.0 {
+            count += 1
+        }
+    }
+    return count
+}
+
+let abnormal = count_abnormal_wbc(wbc_series)
+print("    Elevated readings: " + str(abnormal) + "/" + str(len(wbc_series)))
+
+// ─── Weight-based fluid calculation ───
+print("\n💧 MAINTENANCE FLUIDS (Holliday-Segar):")
+
+fn maintenance_fluids(weight: float) -> float {
+    // Holliday-Segar formula
+    if weight <= 10.0 {
+        return weight * 100.0
+    } elif weight <= 20.0 {
+        return 1000.0 + (weight - 10.0) * 50.0
+    } else {
+        return 1500.0 + (weight - 20.0) * 20.0
+    }
+}
+
+let daily_fluids = maintenance_fluids(weight_kg)
+let hourly_rate = round(daily_fluids / 24.0, 1)
+print("  Daily requirement: " + str(round(daily_fluids)) + " mL/day")
+print("  Hourly rate: " + str(hourly_rate) + " mL/hr")
+
+print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+print("   Report generated by Silk 🧵")
+print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

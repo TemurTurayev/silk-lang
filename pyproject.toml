@@ -1,0 +1,81 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "silk-lang"
+version = "0.2.0"
+description = "A simple, safe programming language for medical computing"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Temur Turayev", email = "temur@tashpmi.uz"}
+]
+keywords = [
+    "programming-language",
+    "interpreter",
+    "medical",
+    "clinical-computing",
+    "healthcare",
+    "bmi",
+    "dosing",
+    "education"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Software Development :: Interpreters",
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/TemurTurayev/silk-lang"
+Documentation = "https://github.com/TemurTurayev/silk-lang#readme"
+Repository = "https://github.com/TemurTurayev/silk-lang"
+Issues = "https://github.com/TemurTurayev/silk-lang/issues"
+
+[project.scripts]
+silk = "silk.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/silk"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/cli",
+    "/examples",
+    "/tests",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src/silk"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+]
