@@ -13,7 +13,8 @@ from .ast import (
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructField, StructInstance,
-    EnumDef, EnumVariant, MatchExpr, MatchArm, ImplBlock
+    EnumDef, EnumVariant, MatchExpr, MatchArm, ImplBlock,
+    InterfaceDef, InterfaceMethodSig
 )
 
 
@@ -121,6 +122,8 @@ class Parser:
             return self.parse_match()
         elif t.type == TokenType.IMPL:
             return self.parse_impl_block()
+        elif t.type == TokenType.INTERFACE:
+            return self.parse_interface_def()
         else:
             return self.parse_expression_statement()
 
@@ -283,10 +286,54 @@ class Parser:
         self.eat(TokenType.RBRACE)
         return EnumDef(name, variants)
 
+    def parse_interface_def(self) -> InterfaceDef:
+        """Parse interface definition with method signatures."""
+        self.eat(TokenType.INTERFACE)
+        name = self.eat(TokenType.IDENTIFIER).value
+        self.eat(TokenType.LBRACE)
+        self.skip_newlines()
+
+        methods = []
+        while not self.match(TokenType.RBRACE):
+            self.eat(TokenType.FN)
+            method_name = self.eat(TokenType.IDENTIFIER).value
+            self.eat(TokenType.LPAREN)
+
+            params = []
+            while not self.match(TokenType.RPAREN):
+                pname = self.eat(TokenType.IDENTIFIER).value
+                ptype = None
+                if self.match(TokenType.COLON):
+                    self.eat(TokenType.COLON)
+                    ptype = self.current().value
+                    self.pos += 1
+                params.append((pname, ptype))
+                if self.match(TokenType.COMMA):
+                    self.eat(TokenType.COMMA)
+            self.eat(TokenType.RPAREN)
+
+            return_type = None
+            if self.match(TokenType.ARROW):
+                self.eat(TokenType.ARROW)
+                return_type = self.current().value
+                self.pos += 1
+
+            methods.append(InterfaceMethodSig(method_name, params, return_type))
+            self.skip_newlines()
+
+        self.eat(TokenType.RBRACE)
+        return InterfaceDef(name, methods)
+
     def parse_impl_block(self) -> ImplBlock:
-        """Parse impl block: impl Name { fn method(self) { ... } ... }"""
+        """Parse impl block: impl Name { ... } or impl Name : Interface { ... }"""
         self.eat(TokenType.IMPL)
         struct_name = self.eat(TokenType.IDENTIFIER).value
+
+        interface_name = None
+        if self.match(TokenType.COLON):
+            self.eat(TokenType.COLON)
+            interface_name = self.eat(TokenType.IDENTIFIER).value
+
         self.eat(TokenType.LBRACE)
         self.skip_newlines()
 
@@ -302,7 +349,7 @@ class Parser:
             self.skip_newlines()
 
         self.eat(TokenType.RBRACE)
-        return ImplBlock(struct_name, methods)
+        return ImplBlock(struct_name, methods, interface_name)
 
     def parse_match(self) -> MatchExpr:
         """Parse match expression."""

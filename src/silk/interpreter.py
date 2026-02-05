@@ -19,7 +19,7 @@ from .ast import (
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructInstance, EnumDef,
-    MatchExpr, MatchArm, ImplBlock
+    MatchExpr, MatchArm, ImplBlock, InterfaceDef
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -283,6 +283,14 @@ class Interpreter:
                 variant_value = SilkEnumValue(node.name, variant.name)
                 env.define(variant.name, variant_value, mutable=False)
 
+        elif isinstance(node, InterfaceDef):
+            iface_info = (
+                'interface_def',
+                node.name,
+                [(m.name, m.params, m.return_type) for m in node.methods]
+            )
+            env.define(node.name, iface_info, mutable=False)
+
         elif isinstance(node, ImplBlock):
             struct_info = env.get(node.struct_name)
             if not isinstance(struct_info, tuple) or struct_info[0] != 'struct_def':
@@ -291,6 +299,11 @@ class Interpreter:
             for method in node.methods:
                 methods[method.name] = (
                     'function', method.params, method.body, env
+                )
+            # Validate interface conformance if specified
+            if node.interface_name:
+                self._check_interface_conformance(
+                    node.struct_name, node.interface_name, methods, env
                 )
 
         else:
@@ -540,6 +553,31 @@ class Interpreter:
                     return self.evaluate(arm.body, match_env)
 
         raise RuntimeError_(f"No matching pattern for value: {value}")
+
+    def _check_interface_conformance(
+        self,
+        struct_name: str,
+        interface_name: str,
+        methods: dict,
+        env: Environment
+    ) -> None:
+        """Verify struct implements all interface methods."""
+        iface = env.get(interface_name)
+        if not isinstance(iface, tuple) or iface[0] != 'interface_def':
+            raise RuntimeError_(f"'{interface_name}' is not an interface")
+
+        _, _, required_methods = iface
+        missing = []
+        for method_name, _, _ in required_methods:
+            if method_name not in methods:
+                missing.append(method_name)
+
+        if missing:
+            raise RuntimeError_(
+                f"Struct '{struct_name}' does not fully implement "
+                f"interface '{interface_name}'. "
+                f"Missing methods: {', '.join(missing)}"
+            )
 
     def _check_enum_exhaustiveness(
         self, enum_name: str, arms: list[MatchArm], env: Environment

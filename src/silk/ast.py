@@ -228,14 +228,34 @@ class EnumDef:
 
 
 # ═══════════════════════════════════════════════════════════
+# INTERFACES
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class InterfaceMethodSig:
+    """Method signature in an interface (no body)."""
+    name: str
+    params: list  # list of (name, type_hint)
+    return_type: str | None
+
+
+@dataclass
+class InterfaceDef:
+    """Interface definition: interface Name { fn method(self) -> type }"""
+    name: str
+    methods: list  # list of InterfaceMethodSig
+
+
+# ═══════════════════════════════════════════════════════════
 # IMPL BLOCKS
 # ═══════════════════════════════════════════════════════════
 
 @dataclass
 class ImplBlock:
-    """Impl block: impl Name { fn method(self) { ... } ... }"""
+    """Impl block: impl Name { ... } or impl Name : Interface { ... }"""
     struct_name: str
     methods: list  # list of FunctionDef
+    interface_name: str | None = None
 
 
 # ═══════════════════════════════════════════════════════════
