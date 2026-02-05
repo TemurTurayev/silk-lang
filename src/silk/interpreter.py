@@ -100,6 +100,56 @@ class SilkEnumValue:
         return f"{self.enum_name}.{self.variant}"
 
 
+class SilkOption:
+    """Option type: Some(value) or None."""
+
+    def __init__(self, value: Any = None, is_some: bool = False):
+        self.value = value
+        self.is_some = is_some
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SilkOption):
+            if self.is_some != other.is_some:
+                return False
+            if self.is_some:
+                return self.value == other.value
+            return True
+        return False
+
+    def __repr__(self) -> str:
+        if self.is_some:
+            return f"Some({silk_repr(self.value)})"
+        return "None"
+
+
+class SilkResult:
+    """Result type: Ok(value) or Err(error)."""
+
+    def __init__(
+        self,
+        value: Any = None,
+        error: Any = None,
+        is_ok: bool = True
+    ):
+        self.value = value
+        self.error = error
+        self.is_ok = is_ok
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SilkResult):
+            if self.is_ok != other.is_ok:
+                return False
+            if self.is_ok:
+                return self.value == other.value
+            return self.error == other.error
+        return False
+
+    def __repr__(self) -> str:
+        if self.is_ok:
+            return f"Ok({silk_repr(self.value)})"
+        return f"Err({silk_repr(self.error)})"
+
+
 class Interpreter:
     """Tree-walking interpreter for Silk."""
 
@@ -112,6 +162,9 @@ class Interpreter:
         """Register all built-in functions."""
         for name, func in ALL_BUILTINS.items():
             self.global_env.define(name, ('builtin', func), mutable=False)
+
+        # Register None as a SilkOption
+        self.global_env.define('None', SilkOption(is_some=False), mutable=False)
 
     def run(self, source: str) -> bool:
         """Run Silk source code."""

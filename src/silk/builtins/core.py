@@ -26,6 +26,16 @@ def silk_repr(value: Any) -> str:
             return "<function>"
         if value[0] == 'builtin':
             return "<builtin>"
+    # Handle SilkOption (duck-typed to avoid circular import)
+    if hasattr(value, 'is_some'):
+        if value.is_some:
+            return f"Some({silk_repr(value.value)})"
+        return "None"
+    # Handle SilkResult (duck-typed to avoid circular import)
+    if hasattr(value, 'is_ok'):
+        if value.is_ok:
+            return f"Ok({silk_repr(value.value)})"
+        return f"Err({silk_repr(value.error)})"
     # Handle SilkStruct (duck-typed to avoid circular import)
     if hasattr(value, 'struct_name') and hasattr(value, 'fields'):
         field_str = ", ".join(
@@ -172,6 +182,30 @@ def builtin_contains(args: list, context: dict) -> bool:
     return item in collection
 
 
+def builtin_some(args: list, context: dict) -> Any:
+    """Create Some(value) Option."""
+    from ..interpreter import SilkOption
+    if len(args) != 1:
+        raise RuntimeError_("Some() takes exactly 1 argument")
+    return SilkOption(args[0], is_some=True)
+
+
+def builtin_ok(args: list, context: dict) -> Any:
+    """Create Ok(value) Result."""
+    from ..interpreter import SilkResult
+    if len(args) != 1:
+        raise RuntimeError_("Ok() takes exactly 1 argument")
+    return SilkResult(value=args[0], is_ok=True)
+
+
+def builtin_err(args: list, context: dict) -> Any:
+    """Create Err(error) Result."""
+    from ..interpreter import SilkResult
+    if len(args) != 1:
+        raise RuntimeError_("Err() takes exactly 1 argument")
+    return SilkResult(error=args[0], is_ok=False)
+
+
 # Export all core built-ins
 CORE_BUILTINS: dict[str, Callable] = {
     'print': builtin_print,
@@ -191,4 +225,7 @@ CORE_BUILTINS: dict[str, Callable] = {
     'join': builtin_join,
     'split': builtin_split,
     'contains': builtin_contains,
+    'Some': builtin_some,
+    'Ok': builtin_ok,
+    'Err': builtin_err,
 }
