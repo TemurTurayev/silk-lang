@@ -18,7 +18,7 @@ from .ast import (
     CompoundAssignment, LetDeclaration, IfStatement, WhileLoop,
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
-    MemberAccess
+    MemberAccess, StructDef, StructInstance
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -67,6 +67,20 @@ class Environment:
         if self.parent:
             return self.parent.exists(name)
         return False
+
+
+class SilkStruct:
+    """Runtime representation of a struct instance."""
+
+    def __init__(self, struct_name: str, fields: dict):
+        self.struct_name = struct_name
+        self.fields = fields
+
+    def __repr__(self) -> str:
+        field_str = ", ".join(
+            f"{k}: {silk_repr(v)}" for k, v in self.fields.items()
+        )
+        return f"{self.struct_name} {{ {field_str} }}"
 
 
 class Interpreter:
@@ -180,6 +194,15 @@ class Interpreter:
         elif isinstance(node, ContinueStatement):
             raise ContinueSignal()
 
+        elif isinstance(node, StructDef):
+            # Store struct definition for later instantiation
+            struct_info = (
+                'struct_def',
+                node.name,
+                [(f.name, f.type_hint) for f in node.fields]
+            )
+            env.define(node.name, struct_info, mutable=False)
+
         else:
             # Expression statement
             self.evaluate(node, env)
@@ -226,6 +249,28 @@ class Interpreter:
         elif isinstance(node, MemberAccess):
             obj = self.evaluate(node.obj, env)
             return self._eval_member(obj, node.member)
+        elif isinstance(node, StructInstance):
+            struct_def = env.get(node.struct_name)
+            if not isinstance(struct_def, tuple) or struct_def[0] != 'struct_def':
+                raise RuntimeError_(f"'{node.struct_name}' is not a struct")
+
+            _, _, field_defs = struct_def
+            field_names = {f[0] for f in field_defs}
+
+            # Validate all required fields are provided
+            for provided in node.field_values.keys():
+                if provided not in field_names:
+                    raise RuntimeError_(
+                        f"Unknown field '{provided}' in struct '{node.struct_name}'"
+                    )
+
+            # Evaluate field values
+            fields = {
+                name: self.evaluate(expr, env)
+                for name, expr in node.field_values.items()
+            }
+
+            return SilkStruct(node.struct_name, fields)
         else:
             raise RuntimeError_(f"Unknown AST node: {type(node).__name__}")
 
@@ -313,6 +358,14 @@ class Interpreter:
 
     def _eval_member(self, obj: Any, member: str) -> Any:
         """Evaluate member access."""
+        # Handle struct field access
+        if isinstance(obj, SilkStruct):
+            if member in obj.fields:
+                return obj.fields[member]
+            raise RuntimeError_(
+                f"Struct '{obj.struct_name}' has no field '{member}'"
+            )
+
         if isinstance(obj, list):
             if member == 'length':
                 return len(obj)

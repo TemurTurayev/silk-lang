@@ -26,6 +26,12 @@ def silk_repr(value: Any) -> str:
             return "<function>"
         if value[0] == 'builtin':
             return "<builtin>"
+    # Handle SilkStruct (duck-typed to avoid circular import)
+    if hasattr(value, 'struct_name') and hasattr(value, 'fields'):
+        field_str = ", ".join(
+            f"{k}: {silk_repr(v)}" for k, v in value.fields.items()
+        )
+        return f"{value.struct_name} {{ {field_str} }}"
     return str(value)
 
 

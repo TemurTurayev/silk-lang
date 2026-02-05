@@ -76,3 +76,57 @@ let p = Patient { name: "Ahmad", age: 8, weight: 25.0 }
         instance = ast.statements[1].value
         assert instance.struct_name == "Patient"
         assert len(instance.field_values) == 3
+
+
+from silk.interpreter import Interpreter
+
+
+class TestStructExecution:
+    """Test struct runtime behavior."""
+
+    @pytest.fixture
+    def interp(self):
+        return Interpreter()
+
+    def test_struct_instance_creation(self, interp):
+        interp.run("""
+struct Patient {
+    name: str,
+    age: int
+}
+let p = Patient { name: "Ahmad", age: 8 }
+print(p.name)
+""")
+        assert interp.output_lines[-1] == "Ahmad"
+
+    def test_struct_field_access(self, interp):
+        interp.run("""
+struct Point { x: float, y: float }
+let p = Point { x: 3.0, y: 4.0 }
+print(p.x + p.y)
+""")
+        # Silk prints whole floats without decimal (e.g., 7.0 -> "7")
+        assert interp.output_lines[-1] == "7"
+
+    def test_struct_in_function(self, interp):
+        interp.run("""
+struct Patient { weight: float, height: float }
+
+fn calc_bmi(p: Patient) -> float {
+    return bmi(p.weight, p.height)
+}
+
+let patient = Patient { weight: 70.0, height: 1.75 }
+print(calc_bmi(patient))
+""")
+        assert "22.86" in interp.output_lines[-1]
+
+    def test_struct_print(self, interp):
+        interp.run("""
+struct Point { x: int, y: int }
+let p = Point { x: 1, y: 2 }
+print(p)
+""")
+        # Should print something like "Point { x: 1, y: 2 }"
+        assert "Point" in interp.output_lines[-1]
+        assert "x" in interp.output_lines[-1]
