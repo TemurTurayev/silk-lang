@@ -232,7 +232,10 @@ class Lexer:
 
             elif ch == '=':
                 self.advance()
-                if self.pos < len(self.source) and self.source[self.pos] == '=':
+                if self.pos < len(self.source) and self.source[self.pos] == '>':
+                    self.advance()
+                    self.add_token(TokenType.ARROW_MATCH)
+                elif self.pos < len(self.source) and self.source[self.pos] == '=':
                     self.advance()
                     self.add_token(TokenType.EQ)
                 else:

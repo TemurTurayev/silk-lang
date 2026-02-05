@@ -39,6 +39,7 @@ class TokenType(Enum):
     IMPORT = auto()
     STRUCT = auto()
     ENUM = auto()
+    MATCH = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -78,6 +79,7 @@ class TokenType(Enum):
     COMMA = auto()
     COLON = auto()
     ARROW = auto()
+    ARROW_MATCH = auto()
     DOT = auto()
     NEWLINE = auto()
     EOF = auto()
@@ -106,6 +108,7 @@ KEYWORDS: dict[str, TokenType] = {
     'import': TokenType.IMPORT,
     'struct': TokenType.STRUCT,
     'enum': TokenType.ENUM,
+    'match': TokenType.MATCH,
 }
 
 

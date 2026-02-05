@@ -13,7 +13,7 @@ from .ast import (
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructField, StructInstance,
-    EnumDef, EnumVariant
+    EnumDef, EnumVariant, MatchExpr, MatchArm
 )
 
 
@@ -109,6 +109,8 @@ class Parser:
             return self.parse_struct_def()
         elif t.type == TokenType.ENUM:
             return self.parse_enum_def()
+        elif t.type == TokenType.MATCH:
+            return self.parse_match()
         else:
             return self.parse_expression_statement()
 
@@ -270,6 +272,45 @@ class Parser:
 
         self.eat(TokenType.RBRACE)
         return EnumDef(name, variants)
+
+    def parse_match(self) -> MatchExpr:
+        """Parse match expression."""
+        self.eat(TokenType.MATCH)
+        value = self.parse_expression()
+        self.eat(TokenType.LBRACE)
+        self.skip_newlines()
+
+        arms = []
+        while not self.match(TokenType.RBRACE):
+            # Parse pattern
+            if self.current().value == '_':
+                pattern = Identifier('_')  # Wildcard
+                self.pos += 1
+            else:
+                pattern = self.parse_postfix()  # Handles Identifier, MemberAccess, literals
+
+            # Optional guard: if condition
+            guard = None
+            if self.match(TokenType.IF):
+                self.eat(TokenType.IF)
+                guard = self.parse_expression()
+
+            self.eat(TokenType.ARROW_MATCH)
+
+            # Parse body (expression or block)
+            if self.match(TokenType.LBRACE):
+                body = self.parse_block()
+            else:
+                body = self.parse_expression()
+
+            arms.append(MatchArm(pattern, guard, body))
+
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+            self.skip_newlines()
+
+        self.eat(TokenType.RBRACE)
+        return MatchExpr(value, arms)
 
     def parse_block(self) -> list:
         """Parse a block { ... }."""

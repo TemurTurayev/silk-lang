@@ -225,3 +225,22 @@ class EnumDef:
     """Enum definition: enum Name { Variant1, Variant2, ... }"""
     name: str
     variants: list  # list of EnumVariant
+
+
+# ═══════════════════════════════════════════════════════════
+# MATCH EXPRESSIONS
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class MatchArm:
+    """A single arm in a match expression."""
+    pattern: Any  # Identifier, MemberAccess, literal, or '_' wildcard
+    guard: Any | None  # Optional 'if' guard expression
+    body: Any  # Expression or list of statements (block)
+
+
+@dataclass
+class MatchExpr:
+    """Match expression: match value { pattern => expr, ... }"""
+    value: Any
+    arms: list  # list of MatchArm
