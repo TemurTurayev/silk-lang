@@ -18,7 +18,8 @@ from .ast import (
     CompoundAssignment, LetDeclaration, IfStatement, WhileLoop,
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
-    MemberAccess, StructDef, StructInstance, EnumDef
+    MemberAccess, StructDef, StructInstance, EnumDef,
+    MatchExpr, MatchArm
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -292,6 +293,8 @@ class Interpreter:
             }
 
             return SilkStruct(node.struct_name, fields)
+        elif isinstance(node, MatchExpr):
+            return self._eval_match(node, env)
         else:
             raise RuntimeError_(f"Unknown AST node: {type(node).__name__}")
 
@@ -423,6 +426,98 @@ class Interpreter:
             context = {'output_lines': self.output_lines}
             return member[1](args, context)
         return member
+
+    def _eval_match(self, node: MatchExpr, env: Environment) -> Any:
+        """Evaluate match expression with exhaustiveness check."""
+        value = self.evaluate(node.value, env)
+
+        # Check exhaustiveness for enum types
+        if isinstance(value, SilkEnumValue):
+            self._check_enum_exhaustiveness(value.enum_name, node.arms, env)
+
+        # Find matching arm
+        for arm in node.arms:
+            if self._pattern_matches(value, arm.pattern, env):
+                # Check guard if present
+                if arm.guard is not None:
+                    guard_result = self.evaluate(arm.guard, env)
+                    if not _truthy(guard_result):
+                        continue
+
+                # Execute body
+                if isinstance(arm.body, list):
+                    # Block body
+                    match_env = Environment(parent=env)
+                    for stmt in arm.body:
+                        self.execute(stmt, match_env)
+                    return None
+                else:
+                    # Expression body
+                    return self.evaluate(arm.body, env)
+
+        raise RuntimeError_(f"No matching pattern for value: {value}")
+
+    def _check_enum_exhaustiveness(
+        self, enum_name: str, arms: list[MatchArm], env: Environment
+    ) -> None:
+        """Verify all enum variants are covered.
+
+        CRITICAL for medical safety: Non-exhaustive matches MUST fail.
+        """
+        enum_def = env.get(enum_name)
+        if not isinstance(enum_def, tuple) or enum_def[0] != 'enum_def':
+            return  # Not an enum, skip check
+
+        _, _, all_variants = enum_def
+        covered_variants = set()
+        has_wildcard = False
+
+        for arm in arms:
+            if isinstance(arm.pattern, Identifier) and arm.pattern.name == '_':
+                has_wildcard = True
+            elif isinstance(arm.pattern, MemberAccess):
+                covered_variants.add(arm.pattern.member)
+            elif isinstance(arm.pattern, Identifier):
+                # Could be a variant name directly
+                covered_variants.add(arm.pattern.name)
+
+        if has_wildcard:
+            return  # Wildcard covers everything
+
+        missing = set(all_variants) - covered_variants
+        if missing:
+            raise RuntimeError_(
+                f"Non-exhaustive match on enum '{enum_name}'. "
+                f"Missing variants: {', '.join(sorted(missing))}. "
+                f"Add missing cases or use '_' wildcard."
+            )
+
+    def _pattern_matches(self, value: Any, pattern: Any, env: Environment) -> bool:
+        """Check if value matches pattern."""
+        if isinstance(pattern, Identifier):
+            if pattern.name == '_':
+                return True  # Wildcard matches everything
+            # Check if it's an enum variant name
+            if isinstance(value, SilkEnumValue):
+                return value.variant == pattern.name
+            return False
+
+        if isinstance(pattern, MemberAccess):
+            # EnumName.Variant pattern
+            if isinstance(value, SilkEnumValue):
+                return value.variant == pattern.member
+            return False
+
+        if isinstance(pattern, NumberLiteral):
+            return value == pattern.value
+
+        if isinstance(pattern, StringLiteral):
+            return value == pattern.value
+
+        if isinstance(pattern, BoolLiteral):
+            return value == pattern.value
+
+        return False
 
 
 # ═══════════════════════════════════════════════════════════

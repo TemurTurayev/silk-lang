@@ -533,6 +533,9 @@ class Parser:
         elif t.type == TokenType.LBRACKET:
             return self.parse_array_literal()
 
+        elif t.type == TokenType.MATCH:
+            return self.parse_match()
+
         else:
             raise ParseError(
                 f"Unexpected token: {t.type.name} ({t.value!r})",
