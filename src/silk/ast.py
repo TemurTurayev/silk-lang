@@ -208,3 +208,20 @@ class StructInstance:
     """Struct instantiation: Name { field: value, ... }"""
     struct_name: str
     field_values: dict  # field_name -> value expression
+
+
+# ═══════════════════════════════════════════════════════════
+# ENUMS
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class EnumVariant:
+    """A variant in an enum definition."""
+    name: str
+
+
+@dataclass
+class EnumDef:
+    """Enum definition: enum Name { Variant1, Variant2, ... }"""
+    name: str
+    variants: list  # list of EnumVariant

@@ -38,6 +38,7 @@ class TokenType(Enum):
     NULL = auto()
     IMPORT = auto()
     STRUCT = auto()
+    ENUM = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -104,6 +105,7 @@ KEYWORDS: dict[str, TokenType] = {
     'null': TokenType.NULL,
     'import': TokenType.IMPORT,
     'struct': TokenType.STRUCT,
+    'enum': TokenType.ENUM,
 }
 
 

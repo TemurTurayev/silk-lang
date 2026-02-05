@@ -18,7 +18,7 @@ from .ast import (
     CompoundAssignment, LetDeclaration, IfStatement, WhileLoop,
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
-    MemberAccess, StructDef, StructInstance
+    MemberAccess, StructDef, StructInstance, EnumDef
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -81,6 +81,22 @@ class SilkStruct:
             f"{k}: {silk_repr(v)}" for k, v in self.fields.items()
         )
         return f"{self.struct_name} {{ {field_str} }}"
+
+
+class SilkEnumValue:
+    """Runtime representation of an enum variant."""
+
+    def __init__(self, enum_name: str, variant: str):
+        self.enum_name = enum_name
+        self.variant = variant
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SilkEnumValue):
+            return self.enum_name == other.enum_name and self.variant == other.variant
+        return False
+
+    def __repr__(self) -> str:
+        return f"{self.enum_name}.{self.variant}"
 
 
 class Interpreter:
@@ -202,6 +218,11 @@ class Interpreter:
                 [(f.name, f.type_hint) for f in node.fields]
             )
             env.define(node.name, struct_info, mutable=False)
+
+        elif isinstance(node, EnumDef):
+            variant_names = [v.name for v in node.variants]
+            enum_info = ('enum_def', node.name, variant_names)
+            env.define(node.name, enum_info, mutable=False)
 
         else:
             # Expression statement
@@ -365,6 +386,13 @@ class Interpreter:
             raise RuntimeError_(
                 f"Struct '{obj.struct_name}' has no field '{member}'"
             )
+
+        # Handle enum variant access
+        if isinstance(obj, tuple) and len(obj) == 3 and obj[0] == 'enum_def':
+            _, enum_name, variants = obj
+            if member in variants:
+                return SilkEnumValue(enum_name, member)
+            raise RuntimeError_(f"Enum '{enum_name}' has no variant '{member}'")
 
         if isinstance(obj, list):
             if member == 'length':

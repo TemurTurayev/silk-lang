@@ -12,7 +12,8 @@ from .ast import (
     CompoundAssignment, LetDeclaration, IfStatement, WhileLoop,
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
-    MemberAccess, StructDef, StructField, StructInstance
+    MemberAccess, StructDef, StructField, StructInstance,
+    EnumDef, EnumVariant
 )
 
 
@@ -106,6 +107,8 @@ class Parser:
             return ContinueStatement()
         elif t.type == TokenType.STRUCT:
             return self.parse_struct_def()
+        elif t.type == TokenType.ENUM:
+            return self.parse_enum_def()
         else:
             return self.parse_expression_statement()
 
@@ -248,6 +251,25 @@ class Parser:
 
         self.eat(TokenType.RBRACE)
         return StructInstance(struct_name, field_values)
+
+    def parse_enum_def(self) -> EnumDef:
+        """Parse enum definition."""
+        self.eat(TokenType.ENUM)
+        name = self.eat(TokenType.IDENTIFIER).value
+        self.eat(TokenType.LBRACE)
+        self.skip_newlines()
+
+        variants = []
+        while not self.match(TokenType.RBRACE):
+            variant_name = self.eat(TokenType.IDENTIFIER).value
+            variants.append(EnumVariant(variant_name))
+
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+            self.skip_newlines()
+
+        self.eat(TokenType.RBRACE)
+        return EnumDef(name, variants)
 
     def parse_block(self) -> list:
         """Parse a block { ... }."""
