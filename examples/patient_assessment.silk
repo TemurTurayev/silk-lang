@@ -1,5 +1,5 @@
 // Patient Assessment with Silk Type System
-// Demonstrates: struct, enum, match with exhaustiveness, Result type
+// Demonstrates: struct, enum, match with exhaustiveness, Result type, impl blocks
 
 struct Patient {
     id: str,
@@ -16,23 +16,28 @@ enum BMICategory {
     Obese
 }
 
-fn classify_bmi(bmi_value: float) -> BMICategory {
-    return match bmi_value {
-        _ if bmi_value < 18.5 => Underweight,
-        _ if bmi_value < 25.0 => Normal,
-        _ if bmi_value < 30.0 => Overweight,
-        _ => Obese
+impl Patient {
+    fn bmi_value(self) -> float {
+        return bmi(self.weight, self.height)
     }
-}
-
-fn safe_dose(mg_per_kg: float, weight: float) {
-    if weight <= 0 {
-        return Err("Invalid weight: must be positive")
+    fn classify_bmi(self) -> BMICategory {
+        let val = bmi(self.weight, self.height)
+        return match val {
+            _ if val < 18.5 => Underweight,
+            _ if val < 25.0 => Normal,
+            _ if val < 30.0 => Overweight,
+            _ => Obese
+        }
     }
-    if mg_per_kg <= 0 {
-        return Err("Invalid dosage: must be positive")
+    fn safe_dose(self, mg_per_kg: float) {
+        if self.weight <= 0 {
+            return Err("Invalid weight: must be positive")
+        }
+        if mg_per_kg <= 0 {
+            return Err("Invalid dosage: must be positive")
+        }
+        return Ok(mg_per_kg * self.weight)
     }
-    return Ok(mg_per_kg * weight)
 }
 
 // Main program
@@ -49,12 +54,10 @@ print("Patient: " + patient.name)
 print("Age: " + str(patient.age) + " years")
 print("Weight: " + str(patient.weight) + " kg")
 print("Height: " + str(patient.height) + " m")
-
-let bmi_value = bmi(patient.weight, patient.height)
-print("BMI: " + str(bmi_value))
+print("BMI: " + str(patient.bmi_value()))
 
 // Exhaustive match - all variants MUST be covered
-match classify_bmi(bmi_value) {
+match patient.classify_bmi() {
     Underweight => print("Status: Consider nutritional support"),
     Normal => print("Status: Healthy weight"),
     Overweight => print("Status: Recommend lifestyle changes"),
@@ -65,14 +68,14 @@ print("")
 print("=== Medication Dosing ===")
 
 // Amoxicillin: 15 mg/kg
-let amox_dose = safe_dose(15.0, patient.weight)
+let amox_dose = patient.safe_dose(15.0)
 match amox_dose {
     Ok(dose) => print("Amoxicillin: " + str(dose) + " mg"),
     Err(e) => print("Error: " + e)
 }
 
 // Ibuprofen: 10 mg/kg
-let ibu_dose = safe_dose(10.0, patient.weight)
+let ibu_dose = patient.safe_dose(10.0)
 match ibu_dose {
     Ok(dose) => print("Ibuprofen: " + str(dose) + " mg"),
     Err(e) => print("Error: " + e)

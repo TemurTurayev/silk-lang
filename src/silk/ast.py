@@ -228,6 +228,17 @@ class EnumDef:
 
 
 # ═══════════════════════════════════════════════════════════
+# IMPL BLOCKS
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class ImplBlock:
+    """Impl block: impl Name { fn method(self) { ... } ... }"""
+    struct_name: str
+    methods: list  # list of FunctionDef
+
+
+# ═══════════════════════════════════════════════════════════
 # MATCH EXPRESSIONS
 # ═══════════════════════════════════════════════════════════
 

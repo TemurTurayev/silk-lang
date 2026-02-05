@@ -19,7 +19,7 @@ from .ast import (
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructInstance, EnumDef,
-    MatchExpr, MatchArm
+    MatchExpr, MatchArm, ImplBlock
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -265,11 +265,12 @@ class Interpreter:
             raise ContinueSignal()
 
         elif isinstance(node, StructDef):
-            # Store struct definition for later instantiation
+            # Store struct definition with empty methods dict
             struct_info = (
                 'struct_def',
                 node.name,
-                [(f.name, f.type_hint) for f in node.fields]
+                [(f.name, f.type_hint) for f in node.fields],
+                {}  # methods dict, populated by impl blocks
             )
             env.define(node.name, struct_info, mutable=False)
 
@@ -281,6 +282,16 @@ class Interpreter:
             for variant in node.variants:
                 variant_value = SilkEnumValue(node.name, variant.name)
                 env.define(variant.name, variant_value, mutable=False)
+
+        elif isinstance(node, ImplBlock):
+            struct_info = env.get(node.struct_name)
+            if not isinstance(struct_info, tuple) or struct_info[0] != 'struct_def':
+                raise RuntimeError_(f"'{node.struct_name}' is not a struct")
+            _, _, _, methods = struct_info
+            for method in node.methods:
+                methods[method.name] = (
+                    'function', method.params, method.body, env
+                )
 
         else:
             # Expression statement
@@ -327,13 +338,13 @@ class Interpreter:
             raise RuntimeError_(f"Cannot index into {type(obj).__name__}")
         elif isinstance(node, MemberAccess):
             obj = self.evaluate(node.obj, env)
-            return self._eval_member(obj, node.member)
+            return self._eval_member(obj, node.member, env)
         elif isinstance(node, StructInstance):
             struct_def = env.get(node.struct_name)
             if not isinstance(struct_def, tuple) or struct_def[0] != 'struct_def':
                 raise RuntimeError_(f"'{node.struct_name}' is not a struct")
 
-            _, _, field_defs = struct_def
+            _, _, field_defs, _ = struct_def
             field_names = {f[0] for f in field_defs}
 
             # Validate all required fields are provided
@@ -410,7 +421,7 @@ class Interpreter:
         elif isinstance(node.name, MemberAccess):
             # Method-style call: obj.method(args)
             obj = self.evaluate(node.name.obj, env)
-            return self._eval_method(obj, node.name.member, args)
+            return self._eval_method(obj, node.name.member, args, env)
         else:
             func = self.evaluate(node.name, env)
 
@@ -437,18 +448,26 @@ class Interpreter:
 
         raise RuntimeError_("Not a callable function")
 
-    def _eval_member(self, obj: Any, member: str) -> Any:
+    def _eval_member(self, obj: Any, member: str, env: Environment | None = None) -> Any:
         """Evaluate member access."""
-        # Handle struct field access
+        # Handle struct field access and methods
         if isinstance(obj, SilkStruct):
             if member in obj.fields:
                 return obj.fields[member]
+            # Check for impl methods
+            if env is not None:
+                struct_info = env.get(obj.struct_name)
+                if (isinstance(struct_info, tuple)
+                        and struct_info[0] == 'struct_def'):
+                    _, _, _, methods = struct_info
+                    if member in methods:
+                        return ('bound_method', methods[member], obj)
             raise RuntimeError_(
-                f"Struct '{obj.struct_name}' has no field '{member}'"
+                f"Struct '{obj.struct_name}' has no field or method '{member}'"
             )
 
         # Handle enum variant access
-        if isinstance(obj, tuple) and len(obj) == 3 and obj[0] == 'enum_def':
+        if isinstance(obj, tuple) and len(obj) >= 3 and obj[0] == 'enum_def':
             _, enum_name, variants = obj
             if member in variants:
                 return SilkEnumValue(enum_name, member)
@@ -476,12 +495,15 @@ class Interpreter:
 
         raise RuntimeError_(f"'{type(obj).__name__}' has no member '{member}'")
 
-    def _eval_method(self, obj: Any, method: str, args: list) -> Any:
+    def _eval_method(self, obj: Any, method: str, args: list, env: Environment | None = None) -> Any:
         """Evaluate method call."""
-        member = self._eval_member(obj, method)
+        member = self._eval_member(obj, method, env)
         if isinstance(member, tuple) and member[0] == 'builtin':
             context = {'output_lines': self.output_lines}
             return member[1](args, context)
+        if isinstance(member, tuple) and member[0] == 'bound_method':
+            _, func, self_obj = member
+            return self._call_function(func, [self_obj] + args)
         return member
 
     def _eval_match(self, node: MatchExpr, env: Environment) -> Any:

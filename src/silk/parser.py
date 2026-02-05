@@ -13,7 +13,7 @@ from .ast import (
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructField, StructInstance,
-    EnumDef, EnumVariant, MatchExpr, MatchArm
+    EnumDef, EnumVariant, MatchExpr, MatchArm, ImplBlock
 )
 
 
@@ -119,6 +119,8 @@ class Parser:
             return self.parse_enum_def()
         elif t.type == TokenType.MATCH:
             return self.parse_match()
+        elif t.type == TokenType.IMPL:
+            return self.parse_impl_block()
         else:
             return self.parse_expression_statement()
 
@@ -280,6 +282,27 @@ class Parser:
 
         self.eat(TokenType.RBRACE)
         return EnumDef(name, variants)
+
+    def parse_impl_block(self) -> ImplBlock:
+        """Parse impl block: impl Name { fn method(self) { ... } ... }"""
+        self.eat(TokenType.IMPL)
+        struct_name = self.eat(TokenType.IDENTIFIER).value
+        self.eat(TokenType.LBRACE)
+        self.skip_newlines()
+
+        methods = []
+        while not self.match(TokenType.RBRACE):
+            if self.match(TokenType.FN):
+                methods.append(self.parse_function_def())
+            else:
+                raise ParseError(
+                    f"Expected 'fn' in impl block, got {self.current().type.name}",
+                    self.current().line, self.current().col
+                )
+            self.skip_newlines()
+
+        self.eat(TokenType.RBRACE)
+        return ImplBlock(struct_name, methods)
 
     def parse_match(self) -> MatchExpr:
         """Parse match expression."""

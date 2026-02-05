@@ -40,6 +40,7 @@ class TokenType(Enum):
     STRUCT = auto()
     ENUM = auto()
     MATCH = auto()
+    IMPL = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -109,6 +110,7 @@ KEYWORDS: dict[str, TokenType] = {
     'struct': TokenType.STRUCT,
     'enum': TokenType.ENUM,
     'match': TokenType.MATCH,
+    'impl': TokenType.IMPL,
 }
 
 
