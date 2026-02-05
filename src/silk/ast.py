@@ -183,3 +183,28 @@ class ContinueStatement:
 class Program:
     """Root node containing all statements."""
     statements: list
+
+
+# ═══════════════════════════════════════════════════════════
+# STRUCTS
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class StructField:
+    """A field in a struct definition."""
+    name: str
+    type_hint: str | None = None
+
+
+@dataclass
+class StructDef:
+    """Struct definition: struct Name { field: type, ... }"""
+    name: str
+    fields: list  # list of StructField
+
+
+@dataclass
+class StructInstance:
+    """Struct instantiation: Name { field: value, ... }"""
+    struct_name: str
+    field_values: dict  # field_name -> value expression

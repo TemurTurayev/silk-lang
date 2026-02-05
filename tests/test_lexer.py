@@ -84,6 +84,11 @@ class TestLexerKeywords:
         assert tokens[1].type == TokenType.BOOL
         assert tokens[1].value is False
 
+    def test_struct_keyword(self, lexer):
+        lex = lexer("struct")
+        tokens = lex.tokenize()
+        assert tokens[0].type == TokenType.STRUCT
+
 
 class TestLexerOperators:
     """Test operator tokenization."""
