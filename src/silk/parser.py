@@ -12,7 +12,7 @@ from .ast import (
     CompoundAssignment, LetDeclaration, IfStatement, WhileLoop,
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
-    MemberAccess
+    MemberAccess, StructDef, StructField
 )
 
 
@@ -90,6 +90,8 @@ class Parser:
         elif t.type == TokenType.CONTINUE:
             self.pos += 1
             return ContinueStatement()
+        elif t.type == TokenType.STRUCT:
+            return self.parse_struct_def()
         else:
             return self.parse_expression_statement()
 
@@ -190,6 +192,29 @@ class Parser:
         if not self.match(TokenType.NEWLINE, TokenType.EOF, TokenType.RBRACE):
             value = self.parse_expression()
         return ReturnStatement(value)
+
+    def parse_struct_def(self) -> StructDef:
+        """Parse struct definition."""
+        self.eat(TokenType.STRUCT)
+        name = self.eat(TokenType.IDENTIFIER).value
+        self.eat(TokenType.LBRACE)
+        self.skip_newlines()
+
+        fields = []
+        while not self.match(TokenType.RBRACE):
+            field_name = self.eat(TokenType.IDENTIFIER).value
+            field_type = None
+            if self.match(TokenType.COLON):
+                self.eat(TokenType.COLON)
+                field_type = self.eat(TokenType.IDENTIFIER).value
+            fields.append(StructField(field_name, field_type))
+
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+            self.skip_newlines()
+
+        self.eat(TokenType.RBRACE)
+        return StructDef(name, fields)
 
     def parse_block(self) -> list:
         """Parse a block { ... }."""
