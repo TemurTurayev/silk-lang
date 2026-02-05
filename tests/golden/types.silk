@@ -1,0 +1,56 @@
+// Phase 1 Type System: struct, enum, match, Option, Result, impl, interface
+
+struct Point { x: float, y: float }
+
+impl Point {
+    fn magnitude(self) -> float {
+        return sqrt(self.x ** 2 + self.y ** 2)
+    }
+}
+
+let p = Point { x: 3.0, y: 4.0 }
+print(p.magnitude())
+
+enum Direction { North, South, East, West }
+
+let d = Direction.North
+match d {
+    North => print("Going north"),
+    South => print("Going south"),
+    East => print("Going east"),
+    West => print("Going west")
+}
+
+let val = Some(42)
+match val {
+    Some(v) => print(v),
+    None => print("nothing")
+}
+
+fn safe_divide(a, b) {
+    if b == 0 {
+        return Err("Division by zero")
+    }
+    return Ok(a / b)
+}
+
+let result = safe_divide(10, 2)
+match result {
+    Ok(v) => print(v),
+    Err(e) => print(e)
+}
+
+interface Describable {
+    fn describe(self)
+}
+
+struct Circle { radius: float }
+
+impl Circle : Describable {
+    fn describe(self) {
+        print("Circle r=" + str(self.radius))
+    }
+}
+
+let c = Circle { radius: 5.0 }
+c.describe()
