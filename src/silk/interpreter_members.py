@@ -185,6 +185,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {(args[1] if k == args[0] else k): v for k, v in obj.items()})
         if member == 'selectKeys':
             return ('builtin', lambda args, ctx: {k: obj[k] for k in args[0] if k in obj})
+        if member == 'invertGrouped':
+            def _ig(args, ctx):
+                r = {}
+                for k, v in obj.items(): r.setdefault(v, []).append(k)
+                return r
+            return ('builtin', _ig)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -240,56 +246,39 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [item for item in obj if self._call_function(args[0], [item])])
         if member == 'forEach':
             def _fe(args, ctx):
-                for item in obj:
-                    self._call_function(args[0], [item])
+                for x in obj: self._call_function(args[0], [x])
             return ('builtin', _fe)
         if member == 'reduce':
             def _reduce(args, ctx):
                 acc = args[1]
-                for item in obj:
-                    acc = self._call_function(args[0], [acc, item])
+                for x in obj: acc = self._call_function(args[0], [acc, x])
                 return acc
             return ('builtin', _reduce)
         if member == 'find':
-            def _find(args, ctx):
-                for item in obj:
-                    if self._call_function(args[0], [item]):
-                        return item
-            return ('builtin', _find)
+            return ('builtin', lambda args, ctx: next((x for x in obj if self._call_function(args[0], [x])), None))
         if member == 'findIndex':
-            def _fi(args, ctx):
-                for i, item in enumerate(obj):
-                    if self._call_function(args[0], [item]):
-                        return i
-                return -1
-            return ('builtin', _fi)
+            return ('builtin', lambda args, ctx: next((i for i, x in enumerate(obj) if self._call_function(args[0], [x])), -1))
         if member in ('every', 'all'):
             return ('builtin', lambda args, ctx: all(self._call_function(args[0], [item]) for item in obj))
         if member in ('some', 'any'):
             return ('builtin', lambda args, ctx: any(self._call_function(args[0], [item]) for item in obj))
         if member == 'flat':
-            def _flat(args, ctx):
-                result = []
-                for item in obj:
-                    (result.extend if isinstance(item, list) else result.append)(item)
-                return result
-            return ('builtin', _flat)
+            return ('builtin', lambda args, ctx: [x for i in obj for x in (i if isinstance(i, list) else [i])])
         if member == 'flatMap':
-            def _flat_map(args, ctx):
-                result = []
-                for item in obj:
-                    mapped = self._call_function(args[0], [item])
-                    (result.extend if isinstance(mapped, list) else result.append)(mapped)
-                return result
-            return ('builtin', _flat_map)
+            def _fm(args, ctx):
+                r = []
+                for x in obj:
+                    m = self._call_function(args[0], [x])
+                    r.extend(m if isinstance(m, list) else [m])
+                return r
+            return ('builtin', _fm)
         if member == 'unique':
-            def _unique(args, ctx):
-                seen = []
-                for item in obj:
-                    if item not in seen:
-                        seen.append(item)
-                return seen
-            return ('builtin', _unique)
+            def _u(args, ctx):
+                s, r = [], []
+                for x in obj:
+                    if x not in s: s.append(x); r.append(x)
+                return r
+            return ('builtin', _u)
         if member == 'count':
             return ('builtin', lambda args, ctx: sum(1 for item in obj if self._call_function(args[0], [item])))
         if member == 'sortBy':
@@ -363,47 +352,36 @@ class MemberMixin:
                 return r
             return ('builtin', _scan)
         if member == 'product':
-            def _product(args, ctx):
+            def _prod(args, ctx):
                 r = 1
-                for item in obj:
-                    r *= item
+                for x in obj: r *= x
                 return r
-            return ('builtin', _product)
+            return ('builtin', _prod)
         if member == 'mapIndexed':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)])
         if member == 'average':
-            def _avg(args, ctx):
-                result = sum(obj) / len(obj)
-                return int(result) if result == int(result) else result
-            return ('builtin', _avg)
+            return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)(sum(obj) / len(obj)))
         if member == 'none':
             return ('builtin', lambda args, ctx: not any(self._call_function(args[0], [item]) for item in obj))
         if member == 'reject':
             return ('builtin', lambda args, ctx: [item for item in obj if not self._call_function(args[0], [item])])
         if member == 'union':
-            def _union(args, ctx):
-                seen = []
-                for item in obj + args[0]:
-                    if item not in seen:
-                        seen.append(item)
-                return seen
-            return ('builtin', _union)
+            def _un(args, ctx):
+                s, r = [], []
+                for x in obj + args[0]:
+                    if x not in s: s.append(x); r.append(x)
+                return r
+            return ('builtin', _un)
         if member == 'shuffle':
-            def _shuffle(args, ctx):
-                copy = list(obj)
-                random.shuffle(copy)
-                return copy
-            return ('builtin', _shuffle)
+            def _sh(args, ctx):
+                c = list(obj); random.shuffle(c); return c
+            return ('builtin', _sh)
         if member == 'forEachIndexed':
             def _fei(args, ctx):
-                for i, item in enumerate(obj):
-                    self._call_function(args[0], [i, item])
+                for i, x in enumerate(obj): self._call_function(args[0], [i, x])
             return ('builtin', _fei)
         if member == 'symmetricDifference':
-            def _sd(args, ctx):
-                other = args[0]
-                return [x for x in obj if x not in other] + [x for x in other if x not in obj]
-            return ('builtin', _sd)
+            return ('builtin', lambda args, ctx: [x for x in obj if x not in args[0]] + [x for x in args[0] if x not in obj])
         if member == 'at':
             return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
         if member == 'associate':
@@ -483,6 +461,15 @@ class MemberMixin:
                 while i < len(obj) and self._call_function(args[0], [obj[i]]): i += 1
                 return [obj[:i], obj[i:]]
             return ('builtin', _span)
+        if member == 'mapWhile':
+            def _mw(args, ctx):
+                r = []
+                for x in obj:
+                    v = self._call_function(args[0], [x])
+                    if v is False: break
+                    r.append(v)
+                return r
+            return ('builtin', _mw)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -655,6 +642,11 @@ class MemberMixin:
             return ('builtin', _dedent)
         if member == 'slugify':
             import re as _re; return ('builtin', lambda args, ctx: _re.sub(r'-+', '-', _re.sub(r'[^a-z0-9]+', '-', obj.lower())).strip('-'))
+        if member == 'isJSON':
+            def _ij(args, ctx):
+                try: json.loads(obj); return True
+                except (ValueError, TypeError): return False
+            return ('builtin', _ij)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -780,6 +772,8 @@ class MemberMixin:
         if member == 'toFraction':
             from fractions import Fraction as _F
             return ('builtin', lambda args, ctx: str(_F(obj).limit_denominator()))
+        if member == 'toCurrency':
+            return ('builtin', lambda args, ctx: f"${obj:,.2f}")
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
