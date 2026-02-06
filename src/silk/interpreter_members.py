@@ -181,6 +181,8 @@ class MemberMixin:
                     return r
                 return _m(obj, args[0])
             return ('builtin', _dm)
+        if member == 'renameKey':
+            return ('builtin', lambda args, ctx: {(args[1] if k == args[0] else k): v for k, v in obj.items()})
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -303,39 +305,25 @@ class MemberMixin:
         if member in ('window', 'windowed'):
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(len(obj) - int(args[0]) + 1)])
         if member == 'rotate':
-            def _rotate(args, ctx):
+            def _rot(args, ctx):
                 n = int(args[0])
-                if not obj:
-                    return []
-                n = n % len(obj)
-                return obj[-n:] + obj[:-n] if n else list(obj)
-            return ('builtin', _rotate)
+                return [] if not obj else (obj[-n % len(obj):] + obj[:-n % len(obj)] if n % len(obj) else list(obj))
+            return ('builtin', _rot)
         if member == 'partition':
-            def _partition(args, ctx):
-                yes, no = [], []
-                for item in obj:
-                    (yes if self._call_function(args[0], [item]) else no).append(item)
-                return [yes, no]
-            return ('builtin', _partition)
+            def _part(args, ctx):
+                y, n = [], []
+                for x in obj: (y if self._call_function(args[0], [x]) else n).append(x)
+                return [y, n]
+            return ('builtin', _part)
         if member == 'findLast':
-            def _find_last(args, ctx):
-                for item in reversed(obj):
-                    if self._call_function(args[0], [item]):
-                        return item
-            return ('builtin', _find_last)
+            return ('builtin', lambda args, ctx: next((x for x in reversed(obj) if self._call_function(args[0], [x])), None))
         if member == 'findLastIndex':
-            def _fli(args, ctx):
-                for i in range(len(obj) - 1, -1, -1):
-                    if self._call_function(args[0], [obj[i]]):
-                        return i
-                return -1
-            return ('builtin', _fli)
+            return ('builtin', lambda args, ctx: next((i for i in range(len(obj)-1, -1, -1) if self._call_function(args[0], [obj[i]])), -1))
         if member in ('tally', 'frequencies'):
             def _tally(args, ctx):
-                counts = {}
-                for item in obj:
-                    counts[item] = counts.get(item, 0) + 1
-                return counts
+                c = {}
+                for x in obj: c[x] = c.get(x, 0) + 1
+                return c
             return ('builtin', _tally)
         if member == 'interleave':
             def _interleave(args, ctx):
@@ -497,6 +485,8 @@ class MemberMixin:
                     else: r.append(g); g, p = [x], k
                 return r + [g]
             return ('builtin', _cb)
+        if member == 'sliding':
+            return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj) - int(args[0]) + 1, int(args[1]))])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -659,6 +649,13 @@ class MemberMixin:
                     f[c] = f.get(c, 0) + 1
                 return f
             return ('builtin', _cf)
+        if member == 'dedent':
+            def _dedent(args, ctx):
+                lines = obj.split('\n')
+                indents = [len(l) - len(l.lstrip()) for l in lines if l.strip()]
+                m = min(indents) if indents else 0
+                return '\n'.join(l[m:] for l in lines)
+            return ('builtin', _dedent)
         if member == 'slugify':
             import re as _re; return ('builtin', lambda args, ctx: _re.sub(r'-+', '-', _re.sub(r'[^a-z0-9]+', '-', obj.lower())).strip('-'))
         raise RuntimeError_(f"'str' has no member '{member}'")
@@ -699,6 +696,7 @@ class MemberMixin:
             'clamp': lambda a: max(a[0], min(obj, a[1])),
             'isBetween': lambda a: a[0] <= obj <= a[1],
             'toBase': lambda a: _to_base(int(obj), int(a[0])),
+            'toBinaryString': lambda a: bin(int(obj))[2:].zfill(int(a[0])),
         }
         if member in _onearg:
             fn = _onearg[member]
