@@ -518,6 +518,11 @@ class MemberMixin:
                     result[key] = result.get(key, 0) + 1
                 return result
             return ('builtin', _frequencies)
+        if member == 'chunk':
+            def _chunk(args, ctx):
+                size = int(args[0])
+                return [obj[i:i + size] for i in range(0, len(obj), size)]
+            return ('builtin', _chunk)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -670,6 +675,19 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj.swapcase())
         if member == 'zfill':
             return ('builtin', lambda args, ctx: obj.zfill(int(args[0])))
+        if member == 'camelCase':
+            def _camel(args, ctx):
+                import re
+                parts = re.split(r'[-_\s]+', obj)
+                return parts[0].lower() + ''.join(w.capitalize() for w in parts[1:])
+            return ('builtin', _camel)
+        if member == 'snakeCase':
+            def _snake(args, ctx):
+                import re
+                s = re.sub(r'[-\s]+', '_', obj)
+                s = re.sub(r'([a-z])([A-Z])', r'\1_\2', s)
+                return s.lower()
+            return ('builtin', _snake)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -692,6 +710,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: fn())
         if member == 'clamp':
             return ('builtin', lambda args, ctx: max(args[0], min(obj, args[1])))
+        if member == 'clampMin':
+            return ('builtin', lambda args, ctx: max(obj, args[0]))
+        if member == 'clampMax':
+            return ('builtin', lambda args, ctx: min(obj, args[0]))
         if member == 'toFixed':
             return ('builtin', lambda args, ctx: f"{obj:.{int(args[0])}f}")
         if member == 'pow':

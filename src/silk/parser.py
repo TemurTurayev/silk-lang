@@ -166,6 +166,8 @@ class Parser(TypeParserMixin):
             return self.parse_do_while()
         elif t.type == TokenType.REPEAT:
             return self.parse_repeat()
+        elif t.type == TokenType.GUARD:
+            return self.parse_guard()
         else:
             return self.parse_expression_statement()
 
@@ -344,6 +346,13 @@ class Parser(TypeParserMixin):
         count = self.parse_expression()
         body = self.parse_block()
         return RepeatLoop(count, body)
+
+    def parse_guard(self) -> IfStatement:
+        self.eat(TokenType.GUARD)
+        condition = self.parse_expression()
+        self.eat(TokenType.ELSE)
+        body = self.parse_block()
+        return IfStatement(UnaryOp('not', condition), body, [], None)
 
     def parse_for(self) -> ForLoop:
         self.eat(TokenType.FOR)
