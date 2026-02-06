@@ -15,7 +15,7 @@ from .ast import (
     MemberAccess, StructDef, StructField, StructInstance,
     EnumDef, EnumVariant, MatchExpr, MatchArm, ImplBlock,
     InterfaceDef, InterfaceMethodSig, ImportStmt,
-    TestBlock, AssertStatement, StringInterp
+    TestBlock, AssertStatement, StringInterp, TryCatch
 )
 
 
@@ -100,7 +100,10 @@ class Parser:
         if t.type == TokenType.LET:
             return self.parse_let()
         elif t.type == TokenType.FN:
-            return self.parse_function_def()
+            if self.peek().type == TokenType.IDENTIFIER:
+                return self.parse_function_def()
+            # Anonymous fn as expression statement — fall through
+            return self.parse_expression_statement()
         elif t.type == TokenType.IF:
             return self.parse_if()
         elif t.type == TokenType.WHILE:
@@ -131,6 +134,8 @@ class Parser:
             return self.parse_test_block()
         elif t.type == TokenType.ASSERT:
             return self.parse_assert()
+        elif t.type == TokenType.TRY:
+            return self.parse_try_catch()
         else:
             return self.parse_expression_statement()
 
@@ -410,6 +415,16 @@ class Parser:
         expression = self.parse_expression()
         return AssertStatement(expression)
 
+    def parse_try_catch(self) -> TryCatch:
+        """Parse try/catch: try { body } catch name { handler }"""
+        self.eat(TokenType.TRY)
+        try_body = self.parse_block()
+        self.skip_newlines()
+        self.eat(TokenType.CATCH)
+        error_name = self.eat(TokenType.IDENTIFIER).value
+        catch_body = self.parse_block()
+        return TryCatch(try_body, error_name, catch_body)
+
     def parse_match(self) -> MatchExpr:
         """Parse match expression."""
         self.eat(TokenType.MATCH)
@@ -505,7 +520,16 @@ class Parser:
 
     def parse_expression(self):
         """Parse expression (entry point)."""
-        return self.parse_or()
+        return self.parse_pipe()
+
+    def parse_pipe(self):
+        """Parse pipe expression (lowest precedence): expr |> func."""
+        left = self.parse_or()
+        while self.match(TokenType.PIPE):
+            self.pos += 1
+            right = self.parse_or()
+            left = BinaryOp(left, '|>', right)
+        return left
 
     def parse_or(self):
         """Parse OR expression."""
@@ -682,11 +706,42 @@ class Parser:
         elif t.type == TokenType.FSTRING:
             return self.parse_fstring()
 
+        elif t.type == TokenType.FN:
+            # Anonymous function expression: fn(params) { body }
+            return self.parse_anonymous_fn()
+
         else:
             raise ParseError(
                 f"Unexpected token: {t.type.name} ({t.value!r})",
                 t.line, t.col
             )
+
+    def parse_anonymous_fn(self) -> FunctionDef:
+        """Parse anonymous function: fn(params) { body }"""
+        self.eat(TokenType.FN)
+        self.eat(TokenType.LPAREN)
+
+        params = []
+        while not self.match(TokenType.RPAREN):
+            pname = self.eat(TokenType.IDENTIFIER).value
+            ptype = None
+            if self.match(TokenType.COLON):
+                self.eat(TokenType.COLON)
+                ptype = self.current().value
+                self.pos += 1
+            params.append((pname, ptype))
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+        self.eat(TokenType.RPAREN)
+
+        return_type = None
+        if self.match(TokenType.ARROW):
+            self.eat(TokenType.ARROW)
+            return_type = self.current().value
+            self.pos += 1
+
+        body = self.parse_block()
+        return FunctionDef("", params, return_type, body)
 
     def parse_fstring(self) -> StringInterp:
         """Parse f-string into alternating string/expression parts.

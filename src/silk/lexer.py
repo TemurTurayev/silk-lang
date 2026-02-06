@@ -335,6 +335,14 @@ class Lexer:
                 self.advance()
                 self.add_token(TokenType.DOT)
 
+            elif ch == '|':
+                self.advance()
+                if self.pos < len(self.source) and self.source[self.pos] == '>':
+                    self.advance()
+                    self.add_token(TokenType.PIPE)
+                else:
+                    raise LexerError("Expected '>' after '|' (pipe operator is |>)", self.line, self.col)
+
             else:
                 raise LexerError(f"Unexpected character '{ch}'", self.line, self.col)
 

@@ -317,3 +317,15 @@ class StringInterp:
     parts is a list of StringLiteral and expression AST nodes.
     """
     parts: list  # alternating StringLiteral and expression nodes
+
+
+# ═══════════════════════════════════════════════════════════
+# ERROR HANDLING
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class TryCatch:
+    """Try/catch statement: try { body } catch name { handler }"""
+    try_body: list
+    error_name: str
+    catch_body: list

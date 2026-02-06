@@ -21,7 +21,7 @@ from .ast import (
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructInstance, EnumDef,
     MatchExpr, MatchArm, ImplBlock, InterfaceDef, ImportStmt,
-    TestBlock, AssertStatement, StringInterp
+    TestBlock, AssertStatement, StringInterp, TryCatch
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -265,7 +265,9 @@ class Interpreter:
 
         elif isinstance(node, FunctionDef):
             func = ('function', node.params, node.body, env)
-            env.define(node.name, func, mutable=False)
+            if node.name:
+                env.define(node.name, func, mutable=False)
+            # Anonymous functions with no name are handled in evaluate()
 
         elif isinstance(node, ReturnStatement):
             value = self.evaluate(node.value, env) if node.value else None
@@ -328,6 +330,14 @@ class Interpreter:
 
         elif isinstance(node, AssertStatement):
             self._execute_assert(node, env)
+
+        elif isinstance(node, TryCatch):
+            try:
+                self.execute_block(node.try_body, Environment(parent=env))
+            except RuntimeError_ as e:
+                catch_env = Environment(parent=env)
+                catch_env.define(node.error_name, str(e), mutable=False)
+                self.execute_block(node.catch_body, catch_env)
 
         else:
             # Expression statement
@@ -412,12 +422,20 @@ class Interpreter:
                     val = self.evaluate(part, env)
                     result_parts.append(silk_repr(val))
             return ''.join(result_parts)
+        elif isinstance(node, FunctionDef):
+            # Anonymous function expression
+            return ('function', node.params, node.body, env)
         else:
             raise RuntimeError_(f"Unknown AST node: {type(node).__name__}")
 
     def _eval_binary(self, node: BinaryOp, env: Environment) -> Any:
         """Evaluate binary operation."""
         left = self.evaluate(node.left, env)
+
+        # Pipe operator: value |> func desugars to func(value)
+        if node.op == '|>':
+            func = self.evaluate(node.right, env)
+            return self._call_function(func, [left])
 
         # Short-circuit for logical operators
         if node.op == 'and':
@@ -481,7 +499,10 @@ class Interpreter:
         if isinstance(func, tuple):
             if func[0] == 'builtin':
                 # Built-in function: pass context for print output capture
-                context = {'output_lines': self.output_lines}
+                context = {
+                    'output_lines': self.output_lines,
+                    'call_function': self._call_function,
+                }
                 return func[1](args, context)
 
             elif func[0] == 'function':

@@ -182,6 +182,24 @@ def builtin_contains(args: list, context: dict) -> bool:
     return item in collection
 
 
+def builtin_map(args: list, context: dict) -> list:
+    """Map a function over an array: map(arr, fn)."""
+    arr, func = args[0], args[1]
+    if not isinstance(arr, list):
+        raise RuntimeError_("map() expects an array as first argument")
+    call = context['call_function']
+    return [call(func, [item]) for item in arr]
+
+
+def builtin_filter(args: list, context: dict) -> list:
+    """Filter an array with a predicate: filter(arr, fn)."""
+    arr, func = args[0], args[1]
+    if not isinstance(arr, list):
+        raise RuntimeError_("filter() expects an array as first argument")
+    call = context['call_function']
+    return [item for item in arr if call(func, [item])]
+
+
 def builtin_some(args: list, context: dict) -> Any:
     """Create Some(value) Option."""
     from ..interpreter import SilkOption
@@ -225,6 +243,8 @@ CORE_BUILTINS: dict[str, Callable] = {
     'join': builtin_join,
     'split': builtin_split,
     'contains': builtin_contains,
+    'map': builtin_map,
+    'filter': builtin_filter,
     'Some': builtin_some,
     'Ok': builtin_ok,
     'Err': builtin_err,
