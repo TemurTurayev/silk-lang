@@ -186,8 +186,6 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: len(obj))
         if member == 'clear':
             return ('builtin', lambda args, ctx: {})
-        if member == 'invert':
-            return ('builtin', lambda args, ctx: {v: k for k, v in obj.items()})
         if member == 'filterValues':
             def _fv(args, ctx):
                 return {k: v for k, v in obj.items() if self._call_function(args[0], [v])}
@@ -204,10 +202,6 @@ class MemberMixin:
                     result[pair[0]] = pair[1]
                 return result
             return ('builtin', _me)
-        if member == 'count':
-            def _count(args, ctx):
-                return sum(1 for k, v in obj.items() if self._call_function(args[0], [k, v]))
-            return ('builtin', _count)
         if member == 'flatMap':
             def _flatmap(args, ctx):
                 result = []
@@ -221,20 +215,40 @@ class MemberMixin:
         """Evaluate member access on a list."""
         if member == 'length':
             return len(obj)
-        if member == 'push':
-            return ('builtin', lambda args, ctx: obj.append(args[0]) or obj)
-        if member == 'pop':
-            return ('builtin', lambda args, ctx: obj.pop())
+        # No-arg methods
+        _noarg = {
+            'pop': lambda: obj.pop(), 'reverse': lambda: obj[::-1],
+            'sort': lambda: sorted(obj), 'sortDescending': lambda: sorted(obj, reverse=True),
+            'min': lambda: min(obj), 'max': lambda: max(obj), 'sum': lambda: sum(obj),
+            'first': lambda: obj[0] if obj else None, 'last': lambda: obj[-1] if obj else None,
+            'isEmpty': lambda: len(obj) == 0, 'compact': lambda: [x for x in obj if x is not None],
+            'enumerate': lambda: [[i, v] for i, v in enumerate(obj)],
+            'pairwise': lambda: [[obj[i], obj[i + 1]] for i in range(len(obj) - 1)],
+            'toString': lambda: silk_repr(obj),
+            'zipWithIndex': lambda: [[v, i] for i, v in enumerate(obj)],
+        }
+        if member in _noarg:
+            fn = _noarg[member]
+            return ('builtin', lambda args, ctx: fn())
+        # Simple one-arg methods
+        _onearg = {
+            'push': lambda a: obj.append(a[0]) or obj,
+            'contains': lambda a: a[0] in obj,
+            'join': lambda a: a[0].join(silk_repr(item) for item in obj),
+            'take': lambda a: obj[:int(a[0])], 'head': lambda a: obj[:int(a[0])],
+            'skip': lambda a: obj[int(a[0]):],
+            'tail': lambda a: obj[-int(a[0]):] if int(a[0]) <= len(obj) else list(obj),
+            'without': lambda a: [x for x in obj if x not in a[0]],
+            'difference': lambda a: [x for x in obj if x not in a[0]],
+            'intersection': lambda a: [x for x in obj if x in a[0]],
+            'zip': lambda a: [[x, y] for x, y in zip(obj, a[0])],
+            'sample': lambda a: random.sample(list(obj), min(int(a[0]), len(obj))),
+        }
+        if member in _onearg:
+            fn = _onearg[member]
+            return ('builtin', lambda args, ctx: fn(args))
         if member == 'slice':
             return ('builtin', lambda args, ctx: obj[int(args[0]):int(args[1])])
-        if member == 'reverse':
-            return ('builtin', lambda args, ctx: obj[::-1])
-        if member == 'contains':
-            return ('builtin', lambda args, ctx: args[0] in obj)
-        if member == 'join':
-            return ('builtin', lambda args, ctx: args[0].join(
-                silk_repr(item) for item in obj
-            ))
         if member == 'indexOf':
             def _index_of(args, ctx):
                 try:
@@ -243,328 +257,218 @@ class MemberMixin:
                     return -1
             return ('builtin', _index_of)
         if member == 'map':
-            def _arr_map(args, ctx):
-                return [self._call_function(args[0], [item]) for item in obj]
-            return ('builtin', _arr_map)
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [item]) for item in obj])
         if member == 'filter':
-            def _arr_filter(args, ctx):
-                return [item for item in obj if self._call_function(args[0], [item])]
-            return ('builtin', _arr_filter)
+            return ('builtin', lambda args, ctx: [item for item in obj if self._call_function(args[0], [item])])
         if member == 'forEach':
-            def _arr_foreach(args, ctx):
+            def _fe(args, ctx):
                 for item in obj:
                     self._call_function(args[0], [item])
-                return None
-            return ('builtin', _arr_foreach)
+            return ('builtin', _fe)
         if member == 'reduce':
-            def _arr_reduce(args, ctx):
+            def _reduce(args, ctx):
                 acc = args[1]
                 for item in obj:
                     acc = self._call_function(args[0], [acc, item])
                 return acc
-            return ('builtin', _arr_reduce)
+            return ('builtin', _reduce)
         if member == 'find':
-            def _arr_find(args, ctx):
+            def _find(args, ctx):
                 for item in obj:
                     if self._call_function(args[0], [item]):
                         return item
-                return None
-            return ('builtin', _arr_find)
+            return ('builtin', _find)
         if member == 'findIndex':
-            def _arr_find_index(args, ctx):
+            def _fi(args, ctx):
                 for i, item in enumerate(obj):
                     if self._call_function(args[0], [item]):
                         return i
                 return -1
-            return ('builtin', _arr_find_index)
-        if member == 'sort':
-            return ('builtin', lambda args, ctx: sorted(obj))
+            return ('builtin', _fi)
         if member in ('every', 'all'):
-            def _arr_every(args, ctx):
-                return all(self._call_function(args[0], [item]) for item in obj)
-            return ('builtin', _arr_every)
+            return ('builtin', lambda args, ctx: all(self._call_function(args[0], [item]) for item in obj))
         if member in ('some', 'any'):
-            def _arr_some(args, ctx):
-                return any(self._call_function(args[0], [item]) for item in obj)
-            return ('builtin', _arr_some)
+            return ('builtin', lambda args, ctx: any(self._call_function(args[0], [item]) for item in obj))
         if member == 'flat':
-            def _arr_flat(args, ctx):
+            def _flat(args, ctx):
                 result = []
                 for item in obj:
-                    if isinstance(item, list):
-                        result.extend(item)
-                    else:
-                        result.append(item)
+                    (result.extend if isinstance(item, list) else result.append)(item)
                 return result
-            return ('builtin', _arr_flat)
+            return ('builtin', _flat)
         if member == 'flatMap':
-            def _arr_flat_map(args, ctx):
+            def _flat_map(args, ctx):
                 result = []
                 for item in obj:
                     mapped = self._call_function(args[0], [item])
-                    if isinstance(mapped, list):
-                        result.extend(mapped)
-                    else:
-                        result.append(mapped)
+                    (result.extend if isinstance(mapped, list) else result.append)(mapped)
                 return result
-            return ('builtin', _arr_flat_map)
-        if member == 'enumerate':
-            return ('builtin', lambda args, ctx: [[i, v] for i, v in enumerate(obj)])
-        if member == 'take':
-            return ('builtin', lambda args, ctx: obj[:int(args[0])])
-        if member == 'skip':
-            return ('builtin', lambda args, ctx: obj[int(args[0]):])
+            return ('builtin', _flat_map)
         if member == 'unique':
-            def _arr_unique(args, ctx):
+            def _unique(args, ctx):
                 seen = []
                 for item in obj:
                     if item not in seen:
                         seen.append(item)
                 return seen
-            return ('builtin', _arr_unique)
+            return ('builtin', _unique)
         if member == 'count':
-            def _arr_count(args, ctx):
-                return sum(1 for item in obj if self._call_function(args[0], [item]))
-            return ('builtin', _arr_count)
+            return ('builtin', lambda args, ctx: sum(1 for item in obj if self._call_function(args[0], [item])))
         if member == 'sortBy':
-            def _arr_sort_by(args, ctx):
-                return sorted(obj, key=lambda item: self._call_function(args[0], [item]))
-            return ('builtin', _arr_sort_by)
+            return ('builtin', lambda args, ctx: sorted(obj, key=lambda item: self._call_function(args[0], [item])))
         if member == 'groupBy':
-            def _arr_group_by(args, ctx):
+            def _group_by(args, ctx):
                 groups = {}
                 for item in obj:
                     key = self._call_function(args[0], [item])
-                    if key not in groups:
-                        groups[key] = []
-                    groups[key].append(item)
+                    groups.setdefault(key, []).append(item)
                 return groups
-            return ('builtin', _arr_group_by)
-        if member == 'min':
-            return ('builtin', lambda args, ctx: min(obj))
-        if member == 'max':
-            return ('builtin', lambda args, ctx: max(obj))
-        if member == 'sum':
-            return ('builtin', lambda args, ctx: sum(obj))
-        if member == 'first':
-            return ('builtin', lambda args, ctx: obj[0] if obj else None)
-        if member == 'last':
-            return ('builtin', lambda args, ctx: obj[-1] if obj else None)
-        if member == 'isEmpty':
-            return ('builtin', lambda args, ctx: len(obj) == 0)
-        if member == 'zip':
-            return ('builtin', lambda args, ctx: [
-                [a, b] for a, b in zip(obj, args[0])
-            ])
-        if member == 'compact':
-            return ('builtin', lambda args, ctx: [x for x in obj if x is not None])
-        if member == 'chunked':
-            def _arr_chunked(args, ctx):
-                n = int(args[0])
-                return [obj[i:i + n] for i in range(0, len(obj), n)]
-            return ('builtin', _arr_chunked)
+            return ('builtin', _group_by)
+        if member in ('chunked', 'chunk'):
+            return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj), int(args[0]))])
+        if member in ('window', 'windowed'):
+            return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(len(obj) - int(args[0]) + 1)])
         if member == 'rotate':
-            def _arr_rotate(args, ctx):
+            def _rotate(args, ctx):
                 n = int(args[0])
                 if not obj:
                     return []
                 n = n % len(obj)
                 return obj[-n:] + obj[:-n] if n else list(obj)
-            return ('builtin', _arr_rotate)
-        if member == 'window':
-            def _arr_window(args, ctx):
-                size = int(args[0])
-                return [obj[i:i + size] for i in range(len(obj) - size + 1)]
-            return ('builtin', _arr_window)
+            return ('builtin', _rotate)
         if member == 'partition':
-            def _arr_partition(args, ctx):
+            def _partition(args, ctx):
                 yes, no = [], []
                 for item in obj:
                     (yes if self._call_function(args[0], [item]) else no).append(item)
                 return [yes, no]
-            return ('builtin', _arr_partition)
+            return ('builtin', _partition)
         if member == 'findLast':
-            def _arr_find_last(args, ctx):
+            def _find_last(args, ctx):
                 for item in reversed(obj):
                     if self._call_function(args[0], [item]):
                         return item
-                return None
-            return ('builtin', _arr_find_last)
+            return ('builtin', _find_last)
         if member == 'findLastIndex':
-            def _arr_find_last_index(args, ctx):
+            def _fli(args, ctx):
                 for i in range(len(obj) - 1, -1, -1):
                     if self._call_function(args[0], [obj[i]]):
                         return i
                 return -1
-            return ('builtin', _arr_find_last_index)
-        if member == 'tally':
-            def _arr_tally(args, ctx):
+            return ('builtin', _fli)
+        if member in ('tally', 'frequencies'):
+            def _tally(args, ctx):
                 counts = {}
                 for item in obj:
                     counts[item] = counts.get(item, 0) + 1
                 return counts
-            return ('builtin', _arr_tally)
-        if member == 'pairwise':
-            return ('builtin', lambda args, ctx: [[obj[i], obj[i + 1]] for i in range(len(obj) - 1)])
+            return ('builtin', _tally)
         if member == 'interleave':
-            def _arr_interleave(args, ctx):
-                other = args[0]
-                result = []
-                i = j = 0
+            def _interleave(args, ctx):
+                other, result, i, j = args[0], [], 0, 0
                 while i < len(obj) or j < len(other):
                     if i < len(obj):
-                        result.append(obj[i])
-                        i += 1
+                        result.append(obj[i]); i += 1
                     if j < len(other):
-                        result.append(other[j])
-                        j += 1
+                        result.append(other[j]); j += 1
                 return result
-            return ('builtin', _arr_interleave)
+            return ('builtin', _interleave)
         if member == 'flatten':
-            def _arr_flatten(args, ctx):
+            def _flatten(args, ctx):
                 depth = int(args[0]) if args else 1
-                def _flat(arr, d):
+                def _f(arr, d):
                     result = []
                     for item in arr:
                         if isinstance(item, list) and d > 0:
-                            result.extend(_flat(item, d - 1))
+                            result.extend(_f(item, d - 1))
                         else:
                             result.append(item)
                     return result
-                return _flat(obj, depth)
-            return ('builtin', _arr_flatten)
+                return _f(obj, depth)
+            return ('builtin', _flatten)
         if member == 'takeWhile':
-            def _arr_take_while(args, ctx):
+            def _tw(args, ctx):
                 result = []
                 for item in obj:
                     if not self._call_function(args[0], [item]):
                         break
                     result.append(item)
                 return result
-            return ('builtin', _arr_take_while)
+            return ('builtin', _tw)
         if member == 'skipWhile':
-            def _arr_skip_while(args, ctx):
+            def _sw(args, ctx):
                 i = 0
                 while i < len(obj) and self._call_function(args[0], [obj[i]]):
                     i += 1
                 return obj[i:]
-            return ('builtin', _arr_skip_while)
+            return ('builtin', _sw)
         if member == 'scan':
-            def _arr_scan(args, ctx):
-                result = []
-                acc = args[1]
+            def _scan(args, ctx):
+                result, acc = [], args[1]
                 for item in obj:
                     acc = self._call_function(args[0], [acc, item])
                     result.append(acc)
                 return result
-            return ('builtin', _arr_scan)
+            return ('builtin', _scan)
         if member == 'product':
-            def _arr_product(args, ctx):
-                result = 1
+            def _product(args, ctx):
+                r = 1
                 for item in obj:
-                    result = result * item
-                return result
-            return ('builtin', _arr_product)
+                    r *= item
+                return r
+            return ('builtin', _product)
         if member == 'mapIndexed':
-            def _arr_map_indexed(args, ctx):
-                return [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)]
-            return ('builtin', _arr_map_indexed)
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)])
         if member == 'average':
-            def _arr_average(args, ctx):
-                total = sum(obj)
-                result = total / len(obj)
+            def _avg(args, ctx):
+                result = sum(obj) / len(obj)
                 return int(result) if result == int(result) else result
-            return ('builtin', _arr_average)
+            return ('builtin', _avg)
         if member == 'none':
-            def _arr_none(args, ctx):
-                return not any(self._call_function(args[0], [item]) for item in obj)
-            return ('builtin', _arr_none)
-        if member == 'without':
-            return ('builtin', lambda args, ctx: [x for x in obj if x not in args[0]])
-        if member == 'head':
-            return ('builtin', lambda args, ctx: obj[:int(args[0])])
-        if member == 'tail':
-            return ('builtin', lambda args, ctx: obj[-int(args[0]):] if int(args[0]) <= len(obj) else list(obj))
+            return ('builtin', lambda args, ctx: not any(self._call_function(args[0], [item]) for item in obj))
         if member == 'reject':
-            def _arr_reject(args, ctx):
-                return [item for item in obj if not self._call_function(args[0], [item])]
-            return ('builtin', _arr_reject)
-        if member == 'intersection':
-            return ('builtin', lambda args, ctx: [x for x in obj if x in args[0]])
+            return ('builtin', lambda args, ctx: [item for item in obj if not self._call_function(args[0], [item])])
         if member == 'union':
-            def _arr_union(args, ctx):
+            def _union(args, ctx):
                 seen = []
                 for item in obj + args[0]:
                     if item not in seen:
                         seen.append(item)
                 return seen
-            return ('builtin', _arr_union)
-        if member == 'sample':
-            return ('builtin', lambda args, ctx: random.sample(list(obj), min(int(args[0]), len(obj))))
+            return ('builtin', _union)
         if member == 'shuffle':
-            def _arr_shuffle(args, ctx):
+            def _shuffle(args, ctx):
                 copy = list(obj)
                 random.shuffle(copy)
                 return copy
-            return ('builtin', _arr_shuffle)
-        if member == 'difference':
-            return ('builtin', lambda args, ctx: [x for x in obj if x not in args[0]])
-        if member == 'sortDescending':
-            return ('builtin', lambda args, ctx: sorted(obj, reverse=True))
+            return ('builtin', _shuffle)
         if member == 'forEachIndexed':
-            def _arr_foreach_indexed(args, ctx):
+            def _fei(args, ctx):
                 for i, item in enumerate(obj):
                     self._call_function(args[0], [i, item])
-                return None
-            return ('builtin', _arr_foreach_indexed)
+            return ('builtin', _fei)
         if member == 'symmetricDifference':
-            def _arr_sym_diff(args, ctx):
+            def _sd(args, ctx):
                 other = args[0]
                 return [x for x in obj if x not in other] + [x for x in other if x not in obj]
-            return ('builtin', _arr_sym_diff)
+            return ('builtin', _sd)
         if member == 'at':
-            def _arr_at(args, ctx):
-                idx = int(args[0])
-                return obj[idx] if -len(obj) <= idx < len(obj) else None
-            return ('builtin', _arr_at)
+            return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
         if member == 'associate':
-            def _arr_associate(args, ctx):
+            def _assoc(args, ctx):
                 result = {}
                 for item in obj:
                     pair = self._call_function(args[0], [item])
                     result[pair[0]] = pair[1]
                 return result
-            return ('builtin', _arr_associate)
-        if member == 'toString':
-            return ('builtin', lambda args, ctx: silk_repr(obj))
-        if member == 'frequencies':
-            def _frequencies(args, ctx):
-                result = {}
-                for item in obj:
-                    key = item
-                    result[key] = result.get(key, 0) + 1
-                return result
-            return ('builtin', _frequencies)
-        if member == 'chunk':
-            def _chunk(args, ctx):
-                size = int(args[0])
-                return [obj[i:i + size] for i in range(0, len(obj), size)]
-            return ('builtin', _chunk)
-        if member == 'windowed':
-            def _windowed(args, ctx):
-                size = int(args[0])
-                return [obj[i:i + size] for i in range(len(obj) - size + 1)]
-            return ('builtin', _windowed)
-        if member == 'zipWithIndex':
-            return ('builtin', lambda args, ctx: [[v, i] for i, v in enumerate(obj)])
+            return ('builtin', _assoc)
         if member == 'interpose':
             def _interpose(args, ctx):
                 if len(obj) <= 1:
                     return list(obj)
                 result = [obj[0]]
                 for item in obj[1:]:
-                    result.append(args[0])
-                    result.append(item)
+                    result.append(args[0]); result.append(item)
                 return result
             return ('builtin', _interpose)
         raise RuntimeError_(f"'list' has no member '{member}'")
