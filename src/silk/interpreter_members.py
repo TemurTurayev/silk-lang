@@ -222,6 +222,8 @@ class MemberMixin:
                     groups.setdefault(v, []).append(k)
                 return groups
             return ('builtin', _gbv)
+        if member == 'toFormattedString':
+            return ('builtin', lambda args, ctx: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -505,6 +507,14 @@ class MemberMixin:
                 mid = s[n // 2 - 1] + s[n // 2]
                 return mid / 2 if mid % 2 else mid // 2
             return ('builtin', _median)
+        if member == 'mode':
+            def _mode(args, ctx):
+                counts = {}
+                for item in obj:
+                    counts[item] = counts.get(item, 0) + 1
+                max_count = max(counts.values())
+                return [k for k, v in counts.items() if v == max_count]
+            return ('builtin', _mode)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -527,6 +537,7 @@ class MemberMixin:
             'isLower': lambda: len(obj) > 0 and obj.islower(),
             'isBlank': lambda: len(obj.strip()) == 0,
             'isAlphanumeric': lambda: len(obj) > 0 and obj.isalnum(),
+            'rot13': lambda: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + 13) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -812,6 +823,16 @@ class MemberMixin:
                     steps += 1
                 return steps
             return ('builtin', _collatz)
+        if member == 'nthPrime':
+            def _nth_prime(args, ctx):
+                count, candidate = 0, 2
+                while True:
+                    if all(candidate % i for i in range(2, int(candidate**0.5) + 1)):
+                        count += 1
+                        if count == int(obj):
+                            return candidate
+                    candidate += 1
+            return ('builtin', _nth_prime)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
