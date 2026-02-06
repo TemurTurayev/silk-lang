@@ -490,6 +490,11 @@ class MemberMixin:
                     self._call_function(args[0], [i, item])
                 return None
             return ('builtin', _arr_foreach_indexed)
+        if member == 'symmetricDifference':
+            def _arr_sym_diff(args, ctx):
+                other = args[0]
+                return [x for x in obj if x not in other] + [x for x in other if x not in obj]
+            return ('builtin', _arr_sym_diff)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -622,6 +627,13 @@ class MemberMixin:
                 import re
                 return re.sub(r' {2,}', ' ', obj)
             return ('builtin', _squeeze)
+        if member == 'mask':
+            def _mask(args, ctx):
+                char, keep = args[0], int(args[1])
+                if len(obj) <= keep:
+                    return obj
+                return char * (len(obj) - keep) + obj[-keep:]
+            return ('builtin', _mask)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -677,6 +689,16 @@ class MemberMixin:
             return ('builtin', _lerp)
         if member == 'map':
             return ('builtin', lambda args, ctx: self._call_function(args[0], [obj]))
+        if member == 'percent':
+            def _percent(args, ctx):
+                result = obj / 100
+                return int(result) if result == int(result) else result
+            return ('builtin', _percent)
+        if member == 'percentOf':
+            def _percent_of(args, ctx):
+                result = obj * args[0] / 100
+                return int(result) if result == int(result) else result
+            return ('builtin', _percent_of)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:

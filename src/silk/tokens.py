@@ -59,6 +59,7 @@ class TokenType(Enum):
     DOUBLE_QUESTION = auto()
     DO = auto()
     CONST = auto()
+    UNLESS = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -140,6 +141,7 @@ KEYWORDS: dict[str, TokenType] = {
     'typeof': TokenType.TYPEOF,
     'do': TokenType.DO,
     'const': TokenType.CONST,
+    'unless': TokenType.UNLESS,
 }
 
 

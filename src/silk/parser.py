@@ -117,6 +117,8 @@ class Parser(TypeParserMixin):
             return self.parse_expression_statement()
         elif t.type == TokenType.IF:
             return self.parse_if()
+        elif t.type == TokenType.UNLESS:
+            return self.parse_unless()
         elif t.type == TokenType.WHILE:
             return self.parse_while()
         elif t.type == TokenType.FOR:
@@ -202,6 +204,17 @@ class Parser(TypeParserMixin):
         self.eat(TokenType.ASSIGN)
         value = self.parse_expression()
         return LetDeclaration(name, False, type_hint, value)
+
+    def parse_unless(self):
+        self.eat(TokenType.UNLESS)
+        condition = UnaryOp('not', self.parse_expression())
+        body = self.parse_block()
+        else_body = None
+        self.skip_newlines()
+        if self.match(TokenType.ELSE):
+            self.eat(TokenType.ELSE)
+            else_body = self.parse_block()
+        return IfStatement(condition, body, [], else_body)
 
     def _parse_destructure_array(self) -> DestructureLetArray:
         self.eat(TokenType.LBRACKET)
