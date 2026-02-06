@@ -119,6 +119,13 @@ class MemberMixin:
                 return {k: self._call_function(args[0], [k, v])
                         for k, v in obj.items()}
             return ('builtin', _map_map)
+        if member == 'isEmpty':
+            return ('builtin', lambda args, ctx: len(obj) == 0)
+        if member == 'count':
+            def _map_count(args, ctx):
+                return sum(1 for k, v in obj.items()
+                           if self._call_function(args[0], [k, v]))
+            return ('builtin', _map_count)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -267,6 +274,19 @@ class MemberMixin:
                 n = int(args[0])
                 return [obj[i:i + n] for i in range(0, len(obj), n)]
             return ('builtin', _arr_chunked)
+        if member == 'rotate':
+            def _arr_rotate(args, ctx):
+                n = int(args[0])
+                if not obj:
+                    return []
+                n = n % len(obj)
+                return obj[-n:] + obj[:-n] if n else list(obj)
+            return ('builtin', _arr_rotate)
+        if member == 'window':
+            def _arr_window(args, ctx):
+                size = int(args[0])
+                return [obj[i:i + size] for i in range(len(obj) - size + 1)]
+            return ('builtin', _arr_window)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -337,6 +357,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj[int(args[0])])
         if member == 'charCodeAt':
             return ('builtin', lambda args, ctx: ord(obj[int(args[0])]))
+        if member == 'count':
+            return ('builtin', lambda args, ctx: obj.count(args[0]))
+        if member == 'isDigit':
+            return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isdigit())
+        if member == 'isAlpha':
+            return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isalpha())
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -351,6 +377,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: round(obj))
         if member == 'toString':
             return ('builtin', lambda args, ctx: str(obj))
+        if member == 'isEven':
+            return ('builtin', lambda args, ctx: int(obj) % 2 == 0)
+        if member == 'isOdd':
+            return ('builtin', lambda args, ctx: int(obj) % 2 != 0)
+        if member == 'clamp':
+            return ('builtin', lambda args, ctx: max(args[0], min(obj, args[1])))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
