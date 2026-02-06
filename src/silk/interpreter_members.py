@@ -152,6 +152,8 @@ class MemberMixin:
                         return v
                 return None
             return ('builtin', _map_find_value)
+        if member == 'defaults':
+            return ('builtin', lambda args, ctx: {**args[0], **obj})
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -406,6 +408,16 @@ class MemberMixin:
             def _arr_map_indexed(args, ctx):
                 return [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)]
             return ('builtin', _arr_map_indexed)
+        if member == 'average':
+            def _arr_average(args, ctx):
+                total = sum(obj)
+                result = total / len(obj)
+                return int(result) if result == int(result) else result
+            return ('builtin', _arr_average)
+        if member == 'none':
+            def _arr_none(args, ctx):
+                return not any(self._call_function(args[0], [item]) for item in obj)
+            return ('builtin', _arr_none)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -519,6 +531,16 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isupper())
         if member == 'isLower':
             return ('builtin', lambda args, ctx: len(obj) > 0 and obj.islower())
+        if member == 'isNumeric':
+            def _is_numeric(args, ctx):
+                if not obj:
+                    return False
+                try:
+                    float(obj)
+                    return True
+                except ValueError:
+                    return False
+            return ('builtin', _is_numeric)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -552,6 +574,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (1 if obj > 0 else (-1 if obj < 0 else 0)))
         if member == 'isBetween':
             return ('builtin', lambda args, ctx: args[0] <= obj <= args[1])
+        if member == 'toRadians':
+            return ('builtin', lambda args, ctx: obj * math.pi / 180)
+        if member == 'toDegrees':
+            return ('builtin', lambda args, ctx: obj * 180 / math.pi)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
