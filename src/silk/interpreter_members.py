@@ -681,6 +681,11 @@ class MemberMixin:
                 n = int(args[0])
                 return obj if len(words) <= n else ' '.join(words[:n]) + '...'
             return ('builtin', _trunc_words)
+        if member == 'isEmail':
+            def _is_email(args, ctx):
+                parts = obj.split('@')
+                return len(parts) == 2 and len(parts[0]) > 0 and '.' in parts[1]
+            return ('builtin', _is_email)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -740,6 +745,16 @@ class MemberMixin:
                     return f"{n}th"
                 return f"{n}{['th','st','nd','rd'][n % 10] if n % 10 < 4 else 'th'}"
             return ('builtin', _ordinal)
+        if member == 'toRoman':
+            def _roman(args, ctx):
+                n, result = int(obj), ''
+                for val, sym in [(1000,'M'),(900,'CM'),(500,'D'),(400,'CD'),(100,'C'),
+                    (90,'XC'),(50,'L'),(40,'XL'),(10,'X'),(9,'IX'),(5,'V'),(4,'IV'),(1,'I')]:
+                    while n >= val:
+                        result += sym
+                        n -= val
+                return result
+            return ('builtin', _roman)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
