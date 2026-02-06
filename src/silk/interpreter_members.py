@@ -321,6 +321,31 @@ class MemberMixin:
                     counts[item] = counts.get(item, 0) + 1
                 return counts
             return ('builtin', _arr_tally)
+        if member == 'takeWhile':
+            def _arr_take_while(args, ctx):
+                result = []
+                for item in obj:
+                    if not self._call_function(args[0], [item]):
+                        break
+                    result.append(item)
+                return result
+            return ('builtin', _arr_take_while)
+        if member == 'skipWhile':
+            def _arr_skip_while(args, ctx):
+                i = 0
+                while i < len(obj) and self._call_function(args[0], [obj[i]]):
+                    i += 1
+                return obj[i:]
+            return ('builtin', _arr_skip_while)
+        if member == 'scan':
+            def _arr_scan(args, ctx):
+                result = []
+                acc = args[1]
+                for item in obj:
+                    acc = self._call_function(args[0], [acc, item])
+                    result.append(acc)
+                return result
+            return ('builtin', _arr_scan)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -403,6 +428,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj.capitalize())
         if member == 'words':
             return ('builtin', lambda args, ctx: obj.split())
+        if member == 'center':
+            return ('builtin', lambda args, ctx: obj.center(int(args[0]), args[1]))
+        if member == 'lines':
+            return ('builtin', lambda args, ctx: obj.split('\n'))
         if member == 'format':
             def _format(args, ctx):
                 result = obj
