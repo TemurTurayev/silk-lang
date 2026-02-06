@@ -463,6 +463,13 @@ class MemberMixin:
                 max_count = max(counts.values())
                 return [k for k, v in counts.items() if v == max_count]
             return ('builtin', _mode)
+        if member == 'stddev':
+            def _stddev(args, ctx):
+                mean = sum(obj) / len(obj)
+                variance = sum((x - mean) ** 2 for x in obj) / len(obj)
+                result = variance ** 0.5
+                return int(result) if result == int(result) else result
+            return ('builtin', _stddev)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -486,6 +493,7 @@ class MemberMixin:
             'isBlank': lambda: len(obj.strip()) == 0,
             'isAlphanumeric': lambda: len(obj) > 0 and obj.isalnum(),
             'rot13': lambda: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + 13) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj),
+            'isPalindrome': lambda: obj == obj[::-1],
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -653,10 +661,26 @@ class MemberMixin:
                         result.append(ch)
                 return ''.join(result)
             return ('builtin', _caesar)
+        if member == 'charFrequency':
+            def _char_freq(args, ctx):
+                freq = {}
+                for ch in obj:
+                    freq[ch] = freq.get(ch, 0) + 1
+                return freq
+            return ('builtin', _char_freq)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
         """Evaluate member access on a number."""
+        def _to_base(n, base):
+            if n == 0:
+                return '0'
+            digits, neg = '0123456789abcdefghijklmnopqrstuvwxyz', n < 0
+            n, result = abs(n), []
+            while n:
+                result.append(digits[n % base])
+                n //= base
+            return ('-' if neg else '') + ''.join(reversed(result))
         _simple = {
             'abs': lambda: abs(obj), 'floor': lambda: math.floor(obj),
             'ceil': lambda: math.ceil(obj), 'round': lambda: round(obj),
@@ -685,6 +709,7 @@ class MemberMixin:
             'lcm': lambda a: abs(int(obj) * int(a[0])) // math.gcd(int(obj), int(a[0])),
             'clamp': lambda a: max(a[0], min(obj, a[1])),
             'isBetween': lambda a: a[0] <= obj <= a[1],
+            'toBase': lambda a: _to_base(int(obj), int(a[0])),
         }
         if member in _onearg:
             fn = _onearg[member]
