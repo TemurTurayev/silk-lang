@@ -187,6 +187,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [k for k in obj if k in args[0]])
         if member == 'valuesWhere':
             return ('builtin', lambda args, ctx: [v for k, v in obj.items() if self._call_function(args[0], [k, v])])
+        if member == 'toSortedKeys':
+            return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -223,6 +225,7 @@ class MemberMixin:
             'sample': lambda a: random.sample(list(obj), min(int(a[0]), len(obj))),
             'dotProduct': lambda a: sum(x * y for x, y in zip(obj, a[0])),
             'zipWith': lambda a: [self._call_function(a[1], [x, y]) for x, y in zip(obj, a[0])],
+            'windows': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)],
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -482,6 +485,7 @@ class MemberMixin:
             'isHexColor': lambda: bool(__import__('re').match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', obj)),
             'normalize': lambda: ' '.join(obj.split()),
             'isIPv4': lambda: len(p := obj.split('.')) == 4 and all(s.isdigit() and 0 <= int(s) <= 255 for s in p),
+            'isPangram': lambda: set('abcdefghijklmnopqrstuvwxyz').issubset(obj.lower()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -660,6 +664,7 @@ class MemberMixin:
             'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
             'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
             'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
+            'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9,
         }
         if member in _simple:
             fn = _simple[member]
@@ -761,11 +766,7 @@ class MemberMixin:
         if member == 'toCurrency':
             return ('builtin', lambda args, ctx: f"${obj:,.2f}")
         if member == 'isAmicable':
-            def _ia(args, ctx):
-                def _ds(n): return sum(i for i in range(1, n) if n % i == 0)
-                a, b = int(obj), int(args[0])
-                return a != b and _ds(a) == b and _ds(b) == a
-            return ('builtin', _ia)
+            return ('builtin', lambda args, ctx: (lambda _ds: (lambda a, b: a != b and _ds(a) == b and _ds(b) == a)(int(obj), int(args[0])))(lambda n: sum(i for i in range(1, n) if n % i == 0)))
         if member == 'primeFactors':
             def _pf(args, ctx):
                 n, f, d = int(obj), [], 2
