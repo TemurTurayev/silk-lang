@@ -470,6 +470,12 @@ class MemberMixin:
                 result = variance ** 0.5
                 return int(result) if result == int(result) else result
             return ('builtin', _stddev)
+        if member == 'variance':
+            def _variance(args, ctx):
+                mean = sum(obj) / len(obj)
+                result = sum((x - mean) ** 2 for x in obj) / len(obj)
+                return int(result) if result == int(result) else result
+            return ('builtin', _variance)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -494,6 +500,8 @@ class MemberMixin:
             'isAlphanumeric': lambda: len(obj) > 0 and obj.isalnum(),
             'rot13': lambda: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + 13) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj),
             'isPalindrome': lambda: obj == obj[::-1],
+            'wordCount': lambda: len(obj.split()) if obj.strip() else 0,
+            'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -806,6 +814,14 @@ class MemberMixin:
                             return candidate
                     candidate += 1
             return ('builtin', _nth_prime)
+        if member == 'isHappy':
+            def _is_happy(args, ctx):
+                n, seen = int(obj), set()
+                while n != 1 and n not in seen:
+                    seen.add(n)
+                    n = sum(int(d) ** 2 for d in str(n))
+                return n == 1
+            return ('builtin', _is_happy)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
