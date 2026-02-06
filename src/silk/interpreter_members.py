@@ -162,6 +162,10 @@ class MemberMixin:
             def _map_some(args, ctx):
                 return any(self._call_function(args[0], [k, v]) for k, v in obj.items())
             return ('builtin', _map_some)
+        if member == 'mapKeys':
+            def _map_keys(args, ctx):
+                return {self._call_function(args[0], [k]): v for k, v in obj.items()}
+            return ('builtin', _map_keys)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -428,6 +432,14 @@ class MemberMixin:
             return ('builtin', _arr_none)
         if member == 'without':
             return ('builtin', lambda args, ctx: [x for x in obj if x not in args[0]])
+        if member == 'head':
+            return ('builtin', lambda args, ctx: obj[:int(args[0])])
+        if member == 'tail':
+            return ('builtin', lambda args, ctx: obj[-int(args[0]):] if int(args[0]) <= len(obj) else list(obj))
+        if member == 'reject':
+            def _arr_reject(args, ctx):
+                return [item for item in obj if not self._call_function(args[0], [item])]
+            return ('builtin', _arr_reject)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -596,6 +608,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj < 0)
         if member == 'isZero':
             return ('builtin', lambda args, ctx: obj == 0)
+        if member == 'isInteger':
+            return ('builtin', lambda args, ctx: isinstance(obj, int))
+        if member == 'isFloat':
+            return ('builtin', lambda args, ctx: isinstance(obj, float))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
