@@ -172,6 +172,15 @@ class MemberMixin:
                     groups.setdefault(v, []).append(k)
                 return groups
             return ('builtin', _gbv)
+        if member == 'deepMerge':
+            def _dm(args, ctx):
+                def _m(a, b):
+                    r = dict(a)
+                    for k, v in b.items():
+                        r[k] = _m(r[k], v) if k in r and isinstance(r[k], dict) and isinstance(v, dict) else v
+                    return r
+                return _m(obj, args[0])
+            return ('builtin', _dm)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -478,6 +487,16 @@ class MemberMixin:
                 result = sum((x - mean) ** 2 for x in obj) / len(obj)
                 return int(result) if result == int(result) else result
             return ('builtin', _variance)
+        if member == 'chunkBy':
+            def _cb(args, ctx):
+                if not obj: return []
+                r, g, p = [], [obj[0]], self._call_function(args[0], [obj[0]])
+                for x in obj[1:]:
+                    k = self._call_function(args[0], [x])
+                    if k == p: g.append(x)
+                    else: r.append(g); g, p = [x], k
+                return r + [g]
+            return ('builtin', _cb)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -505,6 +524,7 @@ class MemberMixin:
             'wordCount': lambda: len(obj.split()) if obj.strip() else 0,
             'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'codePoints': lambda: [ord(c) for c in obj],
             'isHexColor': lambda: bool(__import__('re').match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', obj)),
+            'normalize': lambda: ' '.join(obj.split()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -543,64 +563,41 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: fn(args))
         if member in ('substring', 'slice'):
             return ('builtin', lambda args, ctx: obj[int(args[0]):int(args[1])] if len(args) > 1 else obj[int(args[0]):])
-        if member == 'toInt':
-            def _to_int(args, ctx):
+        if member in ('toInt', 'toFloat'):
+            def _conv(args, ctx):
                 try:
-                    return int(obj)
+                    v = int(obj) if member == 'toInt' else float(obj)
+                    return v if member == 'toInt' or v != int(v) else int(v)
                 except ValueError:
-                    raise RuntimeError_(f"Cannot convert '{obj}' to int")
-            return ('builtin', _to_int)
-        if member == 'toFloat':
-            def _to_float(args, ctx):
-                try:
-                    val = float(obj)
-                    return int(val) if val == int(val) else val
-                except ValueError:
-                    raise RuntimeError_(f"Cannot convert '{obj}' to float")
-            return ('builtin', _to_float)
+                    raise RuntimeError_(f"Cannot convert '{obj}' to {'int' if member == 'toInt' else 'float'}")
+            return ('builtin', _conv)
         if member == 'format':
-            def _format(args, ctx):
-                result = obj
-                for arg in args:
-                    result = result.replace('{}', silk_repr(arg), 1)
-                return result
-            return ('builtin', _format)
-        if member == 'removePrefix':
-            return ('builtin', lambda args, ctx: obj[len(args[0]):] if obj.startswith(args[0]) else obj)
-        if member == 'removeSuffix':
-            return ('builtin', lambda args, ctx: obj[:-len(args[0])] if obj.endswith(args[0]) else obj)
+            def _fmt(args, ctx):
+                r = obj
+                for a in args: r = r.replace('{}', silk_repr(a), 1)
+                return r
+            return ('builtin', _fmt)
+        if member in ('removePrefix', 'removeSuffix'):
+            return ('builtin', lambda args, ctx: (obj[len(args[0]):] if obj.startswith(args[0]) else obj) if member == 'removePrefix' else (obj[:-len(args[0])] if obj.endswith(args[0]) else obj))
         if member == 'truncate':
-            def _truncate(args, ctx):
-                max_len, suffix = int(args[0]), args[1] if len(args) > 1 else ""
-                return obj if len(obj) <= max_len else obj[:max_len - len(suffix)] + suffix
-            return ('builtin', _truncate)
+            return ('builtin', lambda args, ctx: obj if len(obj) <= int(args[0]) else obj[:int(args[0]) - len(args[1] if len(args) > 1 else '')] + (args[1] if len(args) > 1 else ''))
         if member == 'isNumeric':
-            def _is_numeric(args, ctx):
-                if not obj:
-                    return False
-                try:
-                    float(obj)
-                    return True
-                except ValueError:
-                    return False
-            return ('builtin', _is_numeric)
+            def _n(args, ctx):
+                try: return bool(obj) and float(obj) is not None
+                except ValueError: return False
+            return ('builtin', _n)
         if member == 'squeeze':
-            import re as _re
-            return ('builtin', lambda args, ctx: _re.sub(r' {2,}', ' ', obj))
+            return ('builtin', lambda args, ctx: __import__('re').sub(r' {2,}', ' ', obj))
         if member == 'at':
             return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
         if member in ('camelCase', 'snakeCase', 'kebabCase', 'titleCase'):
-            import re as _re
-            def _case_convert(args, ctx):
-                parts = _re.split(r'[-_\s]+', obj)
-                if member == 'camelCase':
-                    return parts[0].lower() + ''.join(w.capitalize() for w in parts[1:])
-                if member == 'titleCase':
-                    return ' '.join(w.capitalize() for w in parts)
-                s = _re.sub(r'[-_\s]+', '_' if member == 'snakeCase' else '-', obj)
-                s = _re.sub(r'([a-z])([A-Z])', r'\1_\2' if member == 'snakeCase' else r'\1-\2', s)
-                return s.lower()
-            return ('builtin', _case_convert)
+            def _cc(args, ctx, _re=__import__('re')):
+                p = _re.split(r'[-_\s]+', obj)
+                if member == 'camelCase': return p[0].lower() + ''.join(w.capitalize() for w in p[1:])
+                if member == 'titleCase': return ' '.join(w.capitalize() for w in p)
+                sep = '_' if member == 'snakeCase' else '-'
+                return _re.sub(r'([a-z])([A-Z])', r'\1' + sep + r'\2', _re.sub(r'[-_\s]+', sep, obj)).lower()
+            return ('builtin', _cc)
         if member == 'truncateWords':
             return ('builtin', lambda args, ctx: obj if len(w := obj.split()) <= int(args[0]) else ' '.join(w[:int(args[0])]) + '...')
         if member == 'isEmail':
@@ -690,6 +687,7 @@ class MemberMixin:
             'toHex': lambda: hex(int(obj))[2:], 'toChar': lambda: chr(int(obj)),
             'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
             'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
+            'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
         }
         if member in _simple:
             fn = _simple[member]
