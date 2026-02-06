@@ -330,12 +330,12 @@ class Interpreter(MemberMixin):
             idx = self.evaluate(node.index, env)
             if isinstance(obj, list):
                 idx_int = int(idx)
-                if idx_int < 0 or idx_int >= len(obj):
+                if idx_int < -len(obj) or idx_int >= len(obj):
                     raise RuntimeError_(f"Index {idx_int} out of bounds for array of length {len(obj)}")
                 return obj[idx_int]
             elif isinstance(obj, str):
                 idx_int = int(idx)
-                if idx_int < 0 or idx_int >= len(obj):
+                if idx_int < -len(obj) or idx_int >= len(obj):
                     raise RuntimeError_(f"Index {idx_int} out of bounds for string of length {len(obj)}")
                 return obj[idx_int]
             elif isinstance(obj, dict):

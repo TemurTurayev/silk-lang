@@ -242,6 +242,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj[-1] if obj else None)
         if member == 'isEmpty':
             return ('builtin', lambda args, ctx: len(obj) == 0)
+        if member == 'zip':
+            return ('builtin', lambda args, ctx: [
+                [a, b] for a, b in zip(obj, args[0])
+            ])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -272,7 +276,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: list(obj))
         if member == 'indexOf':
             return ('builtin', lambda args, ctx: obj.find(args[0]))
-        if member == 'substring':
+        if member in ('substring', 'slice'):
             def _substring(args, ctx):
                 start = int(args[0])
                 if len(args) > 1:
@@ -324,6 +328,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: math.ceil(obj))
         if member == 'round':
             return ('builtin', lambda args, ctx: round(obj))
+        if member == 'toString':
+            return ('builtin', lambda args, ctx: str(obj))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
