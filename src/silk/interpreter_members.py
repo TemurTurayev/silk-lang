@@ -138,6 +138,20 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if k not in args[0]})
         if member == 'invert':
             return ('builtin', lambda args, ctx: {v: k for k, v in obj.items()})
+        if member == 'findKey':
+            def _map_find_key(args, ctx):
+                for k, v in obj.items():
+                    if self._call_function(args[0], [k, v]):
+                        return k
+                return None
+            return ('builtin', _map_find_key)
+        if member == 'findValue':
+            def _map_find_value(args, ctx):
+                for k, v in obj.items():
+                    if self._call_function(args[0], [k, v]):
+                        return v
+                return None
+            return ('builtin', _map_find_value)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -381,6 +395,17 @@ class MemberMixin:
                     result.append(acc)
                 return result
             return ('builtin', _arr_scan)
+        if member == 'product':
+            def _arr_product(args, ctx):
+                result = 1
+                for item in obj:
+                    result = result * item
+                return result
+            return ('builtin', _arr_product)
+        if member == 'mapIndexed':
+            def _arr_map_indexed(args, ctx):
+                return [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)]
+            return ('builtin', _arr_map_indexed)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -490,6 +515,10 @@ class MemberMixin:
                     return obj
                 return obj[:max_len - len(suffix)] + suffix
             return ('builtin', _truncate)
+        if member == 'isUpper':
+            return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isupper())
+        if member == 'isLower':
+            return ('builtin', lambda args, ctx: len(obj) > 0 and obj.islower())
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -521,6 +550,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: math.sqrt(obj))
         if member == 'sign':
             return ('builtin', lambda args, ctx: (1 if obj > 0 else (-1 if obj < 0 else 0)))
+        if member == 'isBetween':
+            return ('builtin', lambda args, ctx: args[0] <= obj <= args[1])
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
