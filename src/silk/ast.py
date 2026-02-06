@@ -178,6 +178,13 @@ class ForLoop:
 
 
 @dataclass
+class DoWhileLoop:
+    """Do-while loop: executes body at least once, then checks condition."""
+    body: list
+    condition: Any
+
+
+@dataclass
 class FunctionDef:
     """Function definition."""
     name: str

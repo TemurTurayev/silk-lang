@@ -9,7 +9,7 @@ from .errors import ParseError
 from .ast import (
     Program, NumberLiteral, StringLiteral, BoolLiteral, NullLiteral,
     ArrayLiteral, Identifier, BinaryOp, UnaryOp, Assignment,
-    CompoundAssignment, LetDeclaration, IfStatement, WhileLoop,
+    CompoundAssignment, LetDeclaration, IfStatement, WhileLoop, DoWhileLoop,
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, ImportStmt,
@@ -147,6 +147,8 @@ class Parser(TypeParserMixin):
             return self.parse_try_catch()
         elif t.type == TokenType.THROW:
             return self.parse_throw()
+        elif t.type == TokenType.DO:
+            return self.parse_do_while()
         else:
             return self.parse_expression_statement()
 
@@ -288,6 +290,14 @@ class Parser(TypeParserMixin):
             self.eat(TokenType.ELSE)
             else_body = self.parse_block()
         return WhileLoop(condition, body, else_body)
+
+    def parse_do_while(self) -> DoWhileLoop:
+        self.eat(TokenType.DO)
+        body = self.parse_block()
+        self.skip_newlines()
+        self.eat(TokenType.WHILE)
+        condition = self.parse_expression()
+        return DoWhileLoop(body, condition)
 
     def parse_for(self) -> ForLoop:
         self.eat(TokenType.FOR)

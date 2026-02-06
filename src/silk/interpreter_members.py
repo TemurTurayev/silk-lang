@@ -190,11 +190,11 @@ class MemberMixin:
             return ('builtin', _arr_find_index)
         if member == 'sort':
             return ('builtin', lambda args, ctx: sorted(obj))
-        if member == 'every':
+        if member in ('every', 'all'):
             def _arr_every(args, ctx):
                 return all(self._call_function(args[0], [item]) for item in obj)
             return ('builtin', _arr_every)
-        if member == 'some':
+        if member in ('some', 'any'):
             def _arr_some(args, ctx):
                 return any(self._call_function(args[0], [item]) for item in obj)
             return ('builtin', _arr_some)
@@ -363,6 +363,13 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isdigit())
         if member == 'isAlpha':
             return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isalpha())
+        if member == 'format':
+            def _format(args, ctx):
+                result = obj
+                for arg in args:
+                    result = result.replace('{}', silk_repr(arg), 1)
+                return result
+            return ('builtin', _format)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:

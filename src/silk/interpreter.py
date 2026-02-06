@@ -16,7 +16,7 @@ from .errors import (
 from .ast import (
     Program, NumberLiteral, StringLiteral, BoolLiteral, NullLiteral,
     ArrayLiteral, Identifier, BinaryOp, UnaryOp, Assignment,
-    CompoundAssignment, LetDeclaration, IfStatement, WhileLoop,
+    CompoundAssignment, LetDeclaration, IfStatement, WhileLoop, DoWhileLoop,
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructInstance, EnumDef,
@@ -195,6 +195,17 @@ class Interpreter(MemberMixin):
                     continue
             if not broke and node.else_body:
                 self.execute_block(node.else_body, Environment(parent=env))
+
+        elif isinstance(node, DoWhileLoop):
+            while True:
+                try:
+                    self.execute_block(node.body, Environment(parent=env))
+                except BreakSignal:
+                    break
+                except ContinueSignal:
+                    pass
+                if not truthy(self.evaluate(node.condition, env)):
+                    break
 
         elif isinstance(node, ForLoop):
             iterable = self.evaluate(node.iterable, env)
@@ -565,18 +576,12 @@ class Interpreter(MemberMixin):
         env.define(alias, self._module_cache[abs_path], mutable=False)
 
     def _execute_assert(self, node: AssertStatement, env: Environment) -> None:
-        """Execute an assert statement."""
         value = self.evaluate(node.expression, env)
         if not truthy(value):
-            if isinstance(node.expression, BinaryOp) and node.expression.op in (
-                '==', '!=', '<', '>', '<=', '>='
-            ):
+            if isinstance(node.expression, BinaryOp) and node.expression.op in ('==', '!=', '<', '>', '<=', '>='):
                 left = self.evaluate(node.expression.left, env)
                 right = self.evaluate(node.expression.right, env)
-                raise RuntimeError_(
-                    f"Assertion failed: {silk_repr(left)} "
-                    f"{node.expression.op} {silk_repr(right)}"
-                )
+                raise RuntimeError_(f"Assertion failed: {silk_repr(left)} {node.expression.op} {silk_repr(right)}")
             raise RuntimeError_("Assertion failed")
 
     def run_tests(
@@ -685,30 +690,17 @@ class Interpreter(MemberMixin):
 
         raise RuntimeError_(f"No matching pattern for value: {value}")
 
-    def _check_interface_conformance(
-        self,
-        struct_name: str,
-        interface_name: str,
-        methods: dict,
-        env: Environment
-    ) -> None:
-        """Verify struct implements all interface methods."""
+    def _check_interface_conformance(self, struct_name: str, interface_name: str,
+                                     methods: dict, env: Environment) -> None:
         iface = env.get(interface_name)
         if not isinstance(iface, tuple) or iface[0] != 'interface_def':
             raise RuntimeError_(f"'{interface_name}' is not an interface")
-
         _, _, required_methods = iface
-        missing = []
-        for method_name, _, _ in required_methods:
-            if method_name not in methods:
-                missing.append(method_name)
-
+        missing = [m for m, _, _ in required_methods if m not in methods]
         if missing:
             raise RuntimeError_(
-                f"Struct '{struct_name}' does not fully implement "
-                f"interface '{interface_name}'. "
-                f"Missing methods: {', '.join(missing)}"
-            )
+                f"Struct '{struct_name}' does not fully implement interface "
+                f"'{interface_name}'. Missing methods: {', '.join(missing)}")
 
     def _check_enum_exhaustiveness(
         self, enum_name: str, arms: list[MatchArm], env: Environment

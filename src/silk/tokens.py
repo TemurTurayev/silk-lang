@@ -57,6 +57,7 @@ class TokenType(Enum):
     BAR = auto()
     QUESTION_DOT = auto()
     DOUBLE_QUESTION = auto()
+    DO = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -136,6 +137,7 @@ KEYWORDS: dict[str, TokenType] = {
     'throw': TokenType.THROW,
     'then': TokenType.THEN,
     'typeof': TokenType.TYPEOF,
+    'do': TokenType.DO,
 }
 
 
