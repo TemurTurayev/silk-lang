@@ -686,6 +686,8 @@ class MemberMixin:
                 parts = obj.split('@')
                 return len(parts) == 2 and len(parts[0]) > 0 and '.' in parts[1]
             return ('builtin', _is_email)
+        if member == 'partition':
+            return ('builtin', lambda args, ctx: list(obj.partition(args[0])))
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -745,6 +747,16 @@ class MemberMixin:
                     return f"{n}th"
                 return f"{n}{['th','st','nd','rd'][n % 10] if n % 10 < 4 else 'th'}"
             return ('builtin', _ordinal)
+        if member == 'isPrime':
+            def _is_prime(args, ctx):
+                n = int(obj)
+                if n < 2:
+                    return False
+                for i in range(2, int(n**0.5) + 1):
+                    if n % i == 0:
+                        return False
+                return True
+            return ('builtin', _is_prime)
         if member == 'toRoman':
             def _roman(args, ctx):
                 n, result = int(obj), ''

@@ -66,6 +66,10 @@ class Interpreter(MemberMixin):
         array_ns = Environment()
         array_ns.define('filled', ('builtin', lambda args, ctx: [args[1]] * int(args[0])), mutable=False)
         self.global_env.define('Array', array_ns, mutable=False)
+        # Dict namespace with static methods
+        dict_ns = Environment()
+        dict_ns.define('fromArrays', ('builtin', lambda args, ctx: dict(zip(args[0], args[1]))), mutable=False)
+        self.global_env.define('Dict', dict_ns, mutable=False)
 
     def run(self, source: str, file_path: Path | None = None) -> bool:
         """Run Silk source code."""
