@@ -500,6 +500,14 @@ class MemberMixin:
                 idx = int(args[0])
                 return obj[idx] if -len(obj) <= idx < len(obj) else None
             return ('builtin', _arr_at)
+        if member == 'associate':
+            def _arr_associate(args, ctx):
+                result = {}
+                for item in obj:
+                    pair = self._call_function(args[0], [item])
+                    result[pair[0]] = pair[1]
+                return result
+            return ('builtin', _arr_associate)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -646,6 +654,8 @@ class MemberMixin:
             return ('builtin', _str_at)
         if member == 'replaceFirst':
             return ('builtin', lambda args, ctx: obj.replace(args[0], args[1], 1))
+        if member == 'isBlank':
+            return ('builtin', lambda args, ctx: len(obj.strip()) == 0)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -711,6 +721,12 @@ class MemberMixin:
                 result = obj * args[0] / 100
                 return int(result) if result == int(result) else result
             return ('builtin', _percent_of)
+        if member == 'toPercent':
+            def _to_percent(args, ctx):
+                val = round(obj * 100, 10)
+                val = int(val) if val == int(val) else val
+                return f"{val}%"
+            return ('builtin', _to_percent)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
