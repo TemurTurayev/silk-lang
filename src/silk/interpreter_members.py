@@ -206,6 +206,7 @@ class MemberMixin:
             'intersection': lambda a: [x for x in obj if x in a[0]],
             'zip': lambda a: [[x, y] for x, y in zip(obj, a[0])],
             'sample': lambda a: random.sample(list(obj), min(int(a[0]), len(obj))),
+            'dotProduct': lambda a: sum(x * y for x, y in zip(obj, a[0])),
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -501,7 +502,7 @@ class MemberMixin:
             'rot13': lambda: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + 13) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj),
             'isPalindrome': lambda: obj == obj[::-1],
             'wordCount': lambda: len(obj.split()) if obj.strip() else 0,
-            'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w),
+            'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'codePoints': lambda: [ord(c) for c in obj],
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -659,6 +660,8 @@ class MemberMixin:
                     f[c] = f.get(c, 0) + 1
                 return f
             return ('builtin', _cf)
+        if member == 'slugify':
+            import re as _re; return ('builtin', lambda args, ctx: _re.sub(r'-+', '-', _re.sub(r'[^a-z0-9]+', '-', obj.lower())).strip('-'))
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -681,14 +684,11 @@ class MemberMixin:
             'isZero': lambda: obj == 0, 'isInteger': lambda: isinstance(obj, int),
             'isFloat': lambda: isinstance(obj, float),
             'sign': lambda: (1 if obj > 0 else (-1 if obj < 0 else 0)),
-            'toRadians': lambda: obj * math.pi / 180,
-            'toDegrees': lambda: obj * 180 / math.pi,
-            'factorial': lambda: math.factorial(int(obj)),
-            'toBinary': lambda: bin(int(obj))[2:],
-            'toHex': lambda: hex(int(obj))[2:],
-            'toChar': lambda: chr(int(obj)),
-            'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))),
-            'digitCount': lambda: len(str(abs(int(obj)))),
+            'toRadians': lambda: obj * math.pi / 180, 'toDegrees': lambda: obj * 180 / math.pi,
+            'factorial': lambda: math.factorial(int(obj)), 'toBinary': lambda: bin(int(obj))[2:],
+            'toHex': lambda: hex(int(obj))[2:], 'toChar': lambda: chr(int(obj)),
+            'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
+            'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj),
         }
         if member in _simple:
             fn = _simple[member]
