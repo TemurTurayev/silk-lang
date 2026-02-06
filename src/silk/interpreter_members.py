@@ -183,6 +183,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'countValues':
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
+        if member == 'withDefaults':
+            return ('builtin', lambda args, ctx: {**args[0], **obj})
         if member == 'keyOf':
             return ('builtin', lambda args, ctx: next((k for k, v in obj.items() if v == args[0]), None))
         if member in ('minByValue', 'maxByValue'):
@@ -203,6 +205,7 @@ class MemberMixin:
             'enumerate': lambda: [[i, v] for i, v in enumerate(obj)],
             'pairwise': lambda: [[obj[i], obj[i + 1]] for i in range(len(obj) - 1)],
             'prefixes': lambda: [obj[:i+1] for i in range(len(obj))],
+            'suffixes': lambda: [obj[i:] for i in range(len(obj))],
             'toString': lambda: silk_repr(obj),
             'zipWithIndex': lambda: [[v, i] for i, v in enumerate(obj)],
         }
@@ -666,6 +669,7 @@ class MemberMixin:
             'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
             'sumTo': lambda: int(obj) * (int(obj) + 1) // 2,
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj),
+            'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
         }
         if member in _simple:
             fn = _simple[member]
@@ -694,11 +698,7 @@ class MemberMixin:
         if member == 'toPercent':
             return ('builtin', lambda args, ctx: f"{int(v) if (v := round(obj * 100, 10)) == int(v) else v}%")
         if member == 'toOrdinal':
-            def _ordinal(args, ctx):
-                n = int(obj)
-                s = 'th' if 11 <= n % 100 <= 13 else ['th','st','nd','rd'][n % 10] if n % 10 < 4 else 'th'
-                return f"{n}{s}"
-            return ('builtin', _ordinal)
+            return ('builtin', lambda args, ctx: (lambda n: f"{n}{'th' if 11 <= n % 100 <= 13 else ['th','st','nd','rd'][n % 10] if n % 10 < 4 else 'th'}")(int(obj)))
         if member == 'isPrime':
             return ('builtin', lambda args, ctx: int(obj) >= 2 and all(int(obj) % i for i in range(2, int(int(obj)**0.5) + 1)))
         if member == 'toRoman':
@@ -730,35 +730,30 @@ class MemberMixin:
                     if num < 20: return _o[num]
                     if num < 100: return _t[num // 10] + ('-' + _o[num % 10] if num % 10 else '')
                     return _o[num // 100] + ' hundred' + (' ' + _ch(num % 100) if num % 100 else '')
-                parts, scales, i, rem = [], ['', ' thousand', ' million', ' billion'], 0, abs(n)
+                p, s, i, rem = [], ['', ' thousand', ' million', ' billion'], 0, abs(n)
                 while rem > 0:
-                    if rem % 1000: parts.append(_ch(rem % 1000) + scales[i])
+                    if rem % 1000: p.append(_ch(rem % 1000) + s[i])
                     rem //= 1000; i += 1
-                r = ' '.join(reversed(parts))
-                return ('negative ' + r) if n < 0 else r
+                return ('negative ' if n < 0 else '') + ' '.join(reversed(p))
             return ('builtin', _tw)
         if member == 'collatz':
-            def _collatz(args, ctx):
+            def _cz(args, ctx):
                 n, s = int(obj), 0
-                while n != 1:
-                    n, s = (n // 2, s + 1) if n % 2 == 0 else (3 * n + 1, s + 1)
+                while n != 1: n, s = (n // 2 if n % 2 == 0 else 3 * n + 1), s + 1
                 return s
-            return ('builtin', _collatz)
+            return ('builtin', _cz)
         if member == 'nthPrime':
             def _np(args, ctx):
-                c, p = 0, 2
-                while True:
-                    if all(p % i for i in range(2, int(p**0.5) + 1)):
-                        c += 1
-                        if c == int(obj):
-                            return p
+                c, p = 0, 1
+                while c < int(obj):
                     p += 1
+                    if all(p % i for i in range(2, int(p**0.5) + 1)): c += 1
+                return p
             return ('builtin', _np)
         if member == 'isHappy':
             def _ih(args, ctx):
-                n, seen = int(obj), set()
-                while n != 1 and n not in seen:
-                    seen.add(n); n = sum(int(d) ** 2 for d in str(n))
+                n, s = int(obj), set()
+                while n != 1 and n not in s: s.add(n); n = sum(int(d) ** 2 for d in str(n))
                 return n == 1
             return ('builtin', _ih)
         if member == 'toFraction':
@@ -777,6 +772,12 @@ class MemberMixin:
                 if n > 1: f.append(n)
                 return f
             return ('builtin', _pf)
+        if member == 'nextPrime':
+            def _nxp(args, ctx):
+                n = int(obj) + 1
+                while not all(n % i for i in range(2, int(n**0.5) + 1)): n += 1
+                return n
+            return ('builtin', _nxp)
         if member == 'asTime':
             def _at(args, ctx):
                 n = int(obj)
