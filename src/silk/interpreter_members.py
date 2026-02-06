@@ -107,7 +107,7 @@ class MemberMixin:
             'omit': lambda a: {k: v for k, v in obj.items() if k not in a[0]},
             'defaults': lambda a: {**a[0], **obj},
         }
-        if member in ('entries', 'toArray'):
+        if member in ('entries', 'toArray', 'toPairs'):
             return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
         if member in ('merge', 'update'):
             return ('builtin', lambda args, ctx: {**obj, **args[0]})
@@ -207,6 +207,7 @@ class MemberMixin:
             'zip': lambda a: [[x, y] for x, y in zip(obj, a[0])],
             'sample': lambda a: random.sample(list(obj), min(int(a[0]), len(obj))),
             'dotProduct': lambda a: sum(x * y for x, y in zip(obj, a[0])),
+            'zipWith': lambda a: [self._call_function(a[1], [x, y]) for x, y in zip(obj, a[0])],
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -503,6 +504,7 @@ class MemberMixin:
             'isPalindrome': lambda: obj == obj[::-1],
             'wordCount': lambda: len(obj.split()) if obj.strip() else 0,
             'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'codePoints': lambda: [ord(c) for c in obj],
+            'isHexColor': lambda: bool(__import__('re').match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -681,14 +683,13 @@ class MemberMixin:
             'toString': lambda: str(obj), 'sqrt': lambda: math.sqrt(obj),
             'isEven': lambda: int(obj) % 2 == 0, 'isOdd': lambda: int(obj) % 2 != 0,
             'isPositive': lambda: obj > 0, 'isNegative': lambda: obj < 0,
-            'isZero': lambda: obj == 0, 'isInteger': lambda: isinstance(obj, int),
-            'isFloat': lambda: isinstance(obj, float),
+            'isZero': lambda: obj == 0, 'isInteger': lambda: isinstance(obj, int), 'isFloat': lambda: isinstance(obj, float),
             'sign': lambda: (1 if obj > 0 else (-1 if obj < 0 else 0)),
             'toRadians': lambda: obj * math.pi / 180, 'toDegrees': lambda: obj * 180 / math.pi,
             'factorial': lambda: math.factorial(int(obj)), 'toBinary': lambda: bin(int(obj))[2:],
             'toHex': lambda: hex(int(obj))[2:], 'toChar': lambda: chr(int(obj)),
             'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
-            'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj),
+            'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
         }
         if member in _simple:
             fn = _simple[member]
@@ -696,8 +697,7 @@ class MemberMixin:
         _onearg = {
             'clampMin': lambda a: max(obj, a[0]), 'clampMax': lambda a: min(obj, a[0]),
             'toFixed': lambda a: f"{obj:.{int(a[0])}f}", 'pow': lambda a: obj ** int(a[0]),
-            'gcd': lambda a: math.gcd(int(obj), int(a[0])),
-            'lcm': lambda a: abs(int(obj) * int(a[0])) // math.gcd(int(obj), int(a[0])),
+            'gcd': lambda a: math.gcd(int(obj), int(a[0])), 'lcm': lambda a: abs(int(obj) * int(a[0])) // math.gcd(int(obj), int(a[0])),
             'clamp': lambda a: max(a[0], min(obj, a[1])),
             'isBetween': lambda a: a[0] <= obj <= a[1],
             'toBase': lambda a: _to_base(int(obj), int(a[0])),
