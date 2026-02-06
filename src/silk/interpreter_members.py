@@ -132,6 +132,12 @@ class MemberMixin:
             def _map_values(args, ctx):
                 return {k: self._call_function(args[0], [v]) for k, v in obj.items()}
             return ('builtin', _map_values)
+        if member == 'pick':
+            return ('builtin', lambda args, ctx: {k: obj[k] for k in args[0] if k in obj})
+        if member == 'omit':
+            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if k not in args[0]})
+        if member == 'invert':
+            return ('builtin', lambda args, ctx: {v: k for k, v in obj.items()})
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -321,6 +327,22 @@ class MemberMixin:
                     counts[item] = counts.get(item, 0) + 1
                 return counts
             return ('builtin', _arr_tally)
+        if member == 'pairwise':
+            return ('builtin', lambda args, ctx: [[obj[i], obj[i + 1]] for i in range(len(obj) - 1)])
+        if member == 'interleave':
+            def _arr_interleave(args, ctx):
+                other = args[0]
+                result = []
+                i = j = 0
+                while i < len(obj) or j < len(other):
+                    if i < len(obj):
+                        result.append(obj[i])
+                        i += 1
+                    if j < len(other):
+                        result.append(other[j])
+                        j += 1
+                return result
+            return ('builtin', _arr_interleave)
         if member == 'flatten':
             def _arr_flatten(args, ctx):
                 depth = int(args[0]) if args else 1
