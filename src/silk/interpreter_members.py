@@ -154,6 +154,14 @@ class MemberMixin:
             return ('builtin', _map_find_value)
         if member == 'defaults':
             return ('builtin', lambda args, ctx: {**args[0], **obj})
+        if member == 'every':
+            def _map_every(args, ctx):
+                return all(self._call_function(args[0], [k, v]) for k, v in obj.items())
+            return ('builtin', _map_every)
+        if member == 'some':
+            def _map_some(args, ctx):
+                return any(self._call_function(args[0], [k, v]) for k, v in obj.items())
+            return ('builtin', _map_some)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -418,6 +426,8 @@ class MemberMixin:
             def _arr_none(args, ctx):
                 return not any(self._call_function(args[0], [item]) for item in obj)
             return ('builtin', _arr_none)
+        if member == 'without':
+            return ('builtin', lambda args, ctx: [x for x in obj if x not in args[0]])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -541,6 +551,8 @@ class MemberMixin:
                 except ValueError:
                     return False
             return ('builtin', _is_numeric)
+        if member == 'wrap':
+            return ('builtin', lambda args, ctx: args[0] + obj + args[1])
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -578,6 +590,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj * math.pi / 180)
         if member == 'toDegrees':
             return ('builtin', lambda args, ctx: obj * 180 / math.pi)
+        if member == 'isPositive':
+            return ('builtin', lambda args, ctx: obj > 0)
+        if member == 'isNegative':
+            return ('builtin', lambda args, ctx: obj < 0)
+        if member == 'isZero':
+            return ('builtin', lambda args, ctx: obj == 0)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
