@@ -25,7 +25,7 @@ from .ast import (
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
     MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
     RangeExpr, TypeofExpr, DestructureLetArray, DestructureLetDict,
-    LambdaExpr, OptionalChain
+    LambdaExpr, OptionalChain, RepeatLoop
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -211,6 +211,16 @@ class Interpreter(MemberMixin):
                     pass
                 if not truthy(self.evaluate(node.condition, env)):
                     break
+
+        elif isinstance(node, RepeatLoop):
+            count = int(self.evaluate(node.count, env))
+            for _ in range(count):
+                try:
+                    self.execute_block(node.body, Environment(parent=env))
+                except BreakSignal:
+                    break
+                except ContinueSignal:
+                    continue
 
         elif isinstance(node, ForLoop):
             iterable = self.evaluate(node.iterable, env)

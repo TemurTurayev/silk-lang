@@ -17,7 +17,7 @@ from .ast import (
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
     MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
     RangeExpr, TypeofExpr, DestructureLetArray, DestructureLetDict,
-    LambdaExpr, OptionalChain
+    LambdaExpr, OptionalChain, RepeatLoop
 )
 from .parser_types import TypeParserMixin
 
@@ -54,6 +54,17 @@ class Parser(TypeParserMixin):
 
     def match(self, *types: TokenType) -> bool:
         return self.current().type in types
+
+    def _eat_member_name(self) -> str:
+        """Eat a member name after dot - allows keywords as member names."""
+        t = self.current()
+        if t.type == TokenType.IDENTIFIER:
+            self.pos += 1
+            return t.value
+        if t.value and isinstance(t.value, str) and t.value.isalpha():
+            self.pos += 1
+            return t.value
+        raise ParseError(f"Expected member name, got {t.type.name}", t.line, t.col)
 
     def is_struct_instance_start(self) -> bool:
         """Check if current position starts a struct instantiation."""
@@ -153,6 +164,8 @@ class Parser(TypeParserMixin):
             return self.parse_throw()
         elif t.type == TokenType.DO:
             return self.parse_do_while()
+        elif t.type == TokenType.REPEAT:
+            return self.parse_repeat()
         else:
             return self.parse_expression_statement()
 
@@ -325,6 +338,12 @@ class Parser(TypeParserMixin):
         self.eat(TokenType.WHILE)
         condition = self.parse_expression()
         return DoWhileLoop(body, condition)
+
+    def parse_repeat(self) -> RepeatLoop:
+        self.eat(TokenType.REPEAT)
+        count = self.parse_expression()
+        body = self.parse_block()
+        return RepeatLoop(count, body)
 
     def parse_for(self) -> ForLoop:
         self.eat(TokenType.FOR)
@@ -585,7 +604,7 @@ class Parser(TypeParserMixin):
                 expr = IndexAccess(expr, index)
             elif self.match(TokenType.DOT):
                 self.eat(TokenType.DOT)
-                member = self.eat(TokenType.IDENTIFIER).value
+                member = self._eat_member_name()
                 expr = MemberAccess(expr, member)
                 if self.match(TokenType.LBRACE) and self.is_struct_instance_start():
                     instance = self.parse_struct_instance(member)
@@ -593,7 +612,7 @@ class Parser(TypeParserMixin):
                     expr = instance
             elif self.match(TokenType.QUESTION_DOT):
                 self.eat(TokenType.QUESTION_DOT)
-                member = self.eat(TokenType.IDENTIFIER).value
+                member = self._eat_member_name()
                 expr = OptionalChain(expr, member)
             else:
                 break

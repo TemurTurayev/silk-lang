@@ -185,6 +185,13 @@ class DoWhileLoop:
 
 
 @dataclass
+class RepeatLoop:
+    """Repeat loop: repeat n { body }"""
+    count: Any
+    body: list
+
+
+@dataclass
 class FunctionDef:
     """Function definition."""
     name: str

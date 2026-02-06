@@ -97,9 +97,9 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: args[0] in obj)
         if member == 'delete':
             return ('builtin', lambda args, ctx: obj.pop(args[0], None))
-        if member == 'entries':
+        if member in ('entries', 'toArray'):
             return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
-        if member == 'merge':
+        if member in ('merge', 'update'):
             return ('builtin', lambda args, ctx: {**obj, **args[0]})
         if member == 'forEach':
             def _map_foreach(args, ctx):
@@ -128,8 +128,6 @@ class MemberMixin:
                 return sum(1 for k, v in obj.items()
                            if self._call_function(args[0], [k, v]))
             return ('builtin', _map_count)
-        if member == 'toArray':
-            return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
         if member == 'mapValues':
             def _map_values(args, ctx):
                 return {k: self._call_function(args[0], [v]) for k, v in obj.items()}
@@ -184,12 +182,12 @@ class MemberMixin:
                     return str(v)
                 return json.dumps(_convert(obj))
             return ('builtin', _to_json)
-        if member == 'update':
-            return ('builtin', lambda args, ctx: {**obj, **args[0]})
         if member == 'size':
             return ('builtin', lambda args, ctx: len(obj))
         if member == 'clear':
             return ('builtin', lambda args, ctx: {})
+        if member == 'invert':
+            return ('builtin', lambda args, ctx: {v: k for k, v in obj.items()})
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -512,6 +510,14 @@ class MemberMixin:
             return ('builtin', _arr_associate)
         if member == 'toString':
             return ('builtin', lambda args, ctx: silk_repr(obj))
+        if member == 'frequencies':
+            def _frequencies(args, ctx):
+                result = {}
+                for item in obj:
+                    key = item
+                    result[key] = result.get(key, 0) + 1
+                return result
+            return ('builtin', _frequencies)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -662,79 +668,53 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: len(obj.strip()) == 0)
         if member == 'swapCase':
             return ('builtin', lambda args, ctx: obj.swapcase())
+        if member == 'zfill':
+            return ('builtin', lambda args, ctx: obj.zfill(int(args[0])))
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
         """Evaluate member access on a number."""
-        if member == 'abs':
-            return ('builtin', lambda args, ctx: abs(obj))
-        if member == 'floor':
-            return ('builtin', lambda args, ctx: math.floor(obj))
-        if member == 'ceil':
-            return ('builtin', lambda args, ctx: math.ceil(obj))
-        if member == 'round':
-            return ('builtin', lambda args, ctx: round(obj))
-        if member == 'toString':
-            return ('builtin', lambda args, ctx: str(obj))
-        if member == 'isEven':
-            return ('builtin', lambda args, ctx: int(obj) % 2 == 0)
-        if member == 'isOdd':
-            return ('builtin', lambda args, ctx: int(obj) % 2 != 0)
+        _simple = {
+            'abs': lambda: abs(obj), 'floor': lambda: math.floor(obj),
+            'ceil': lambda: math.ceil(obj), 'round': lambda: round(obj),
+            'toString': lambda: str(obj), 'sqrt': lambda: math.sqrt(obj),
+            'isEven': lambda: int(obj) % 2 == 0, 'isOdd': lambda: int(obj) % 2 != 0,
+            'isPositive': lambda: obj > 0, 'isNegative': lambda: obj < 0,
+            'isZero': lambda: obj == 0, 'isInteger': lambda: isinstance(obj, int),
+            'isFloat': lambda: isinstance(obj, float),
+            'sign': lambda: (1 if obj > 0 else (-1 if obj < 0 else 0)),
+            'toRadians': lambda: obj * math.pi / 180,
+            'toDegrees': lambda: obj * 180 / math.pi,
+            'factorial': lambda: math.factorial(int(obj)),
+        }
+        if member in _simple:
+            fn = _simple[member]
+            return ('builtin', lambda args, ctx: fn())
         if member == 'clamp':
             return ('builtin', lambda args, ctx: max(args[0], min(obj, args[1])))
         if member == 'toFixed':
-            def _to_fixed(args, ctx):
-                digits = int(args[0])
-                return f"{obj:.{digits}f}"
-            return ('builtin', _to_fixed)
+            return ('builtin', lambda args, ctx: f"{obj:.{int(args[0])}f}")
         if member == 'pow':
             return ('builtin', lambda args, ctx: obj ** int(args[0]))
-        if member == 'sqrt':
-            return ('builtin', lambda args, ctx: math.sqrt(obj))
-        if member == 'sign':
-            return ('builtin', lambda args, ctx: (1 if obj > 0 else (-1 if obj < 0 else 0)))
         if member == 'isBetween':
             return ('builtin', lambda args, ctx: args[0] <= obj <= args[1])
-        if member == 'toRadians':
-            return ('builtin', lambda args, ctx: obj * math.pi / 180)
-        if member == 'toDegrees':
-            return ('builtin', lambda args, ctx: obj * 180 / math.pi)
-        if member == 'isPositive':
-            return ('builtin', lambda args, ctx: obj > 0)
-        if member == 'isNegative':
-            return ('builtin', lambda args, ctx: obj < 0)
-        if member == 'isZero':
-            return ('builtin', lambda args, ctx: obj == 0)
-        if member == 'isInteger':
-            return ('builtin', lambda args, ctx: isinstance(obj, int))
-        if member == 'isFloat':
-            return ('builtin', lambda args, ctx: isinstance(obj, float))
         if member == 'lerp':
             def _lerp(args, ctx):
-                target, t = args[0], args[1]
-                result = obj + (target - obj) * t
+                result = obj + (args[0] - obj) * args[1]
                 return int(result) if result == int(result) else result
             return ('builtin', _lerp)
         if member == 'map':
             return ('builtin', lambda args, ctx: self._call_function(args[0], [obj]))
-        if member == 'percent':
-            def _percent(args, ctx):
-                result = obj / 100
+        if member in ('percent', 'percentOf'):
+            def _pct(args, ctx):
+                result = (obj / 100) if member == 'percent' else (obj * args[0] / 100)
                 return int(result) if result == int(result) else result
-            return ('builtin', _percent)
-        if member == 'percentOf':
-            def _percent_of(args, ctx):
-                result = obj * args[0] / 100
-                return int(result) if result == int(result) else result
-            return ('builtin', _percent_of)
+            return ('builtin', _pct)
         if member == 'toPercent':
             def _to_percent(args, ctx):
                 val = round(obj * 100, 10)
-                val = int(val) if val == int(val) else val
-                return f"{val}%"
+                return f"{int(val) if val == int(val) else val}%"
             return ('builtin', _to_percent)
-        if member == 'factorial':
-            return ('builtin', lambda args, ctx: math.factorial(int(obj)))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:

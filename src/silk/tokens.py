@@ -60,6 +60,7 @@ class TokenType(Enum):
     DO = auto()
     CONST = auto()
     UNLESS = auto()
+    REPEAT = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -142,6 +143,7 @@ KEYWORDS: dict[str, TokenType] = {
     'do': TokenType.DO,
     'const': TokenType.CONST,
     'unless': TokenType.UNLESS,
+    'repeat': TokenType.REPEAT,
 }
 
 
