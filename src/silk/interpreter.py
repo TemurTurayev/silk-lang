@@ -209,14 +209,25 @@ class Interpreter(MemberMixin):
 
         elif isinstance(node, ForLoop):
             iterable = self.evaluate(node.iterable, env)
-            if not isinstance(iterable, list):
-                raise RuntimeError_("for..in requires an iterable (array or range)")
+            is_dict = isinstance(iterable, dict)
+            if is_dict:
+                entries = list(iterable.items())
+            elif isinstance(iterable, list):
+                entries = None
+            else:
+                raise RuntimeError_("for..in requires an iterable (array, range, or map)")
             broke = False
-            for i, item in enumerate(iterable):
+            for i, item in enumerate(entries if is_dict else iterable):
                 loop_env = Environment(parent=env)
-                loop_env.define(node.var_name, item)
-                if node.index_name is not None:
-                    loop_env.define(node.index_name, i)
+                if is_dict:
+                    key, val = item
+                    loop_env.define(node.var_name, val if node.index_name else key)
+                    if node.index_name:
+                        loop_env.define(node.index_name, key)
+                else:
+                    loop_env.define(node.var_name, item)
+                    if node.index_name:
+                        loop_env.define(node.index_name, i)
                 try:
                     self.execute_block(node.body, loop_env)
                 except BreakSignal:
@@ -702,36 +713,26 @@ class Interpreter(MemberMixin):
                 f"Struct '{struct_name}' does not fully implement interface "
                 f"'{interface_name}'. Missing methods: {', '.join(missing)}")
 
-    def _check_enum_exhaustiveness(
-        self, enum_name: str, arms: list[MatchArm], env: Environment
-    ) -> None:
-        """Verify all enum variants are covered."""
+    def _check_enum_exhaustiveness(self, enum_name: str, arms: list[MatchArm],
+                                   env: Environment) -> None:
         enum_def = env.get(enum_name)
         if not isinstance(enum_def, tuple) or enum_def[0] != 'enum_def':
             return
-
         _, _, all_variants = enum_def
         covered_variants = set()
-        has_wildcard = False
-
         for arm in arms:
             if isinstance(arm.pattern, Identifier) and arm.pattern.name == '_':
-                has_wildcard = True
+                return
             elif isinstance(arm.pattern, MemberAccess):
                 covered_variants.add(arm.pattern.member)
             elif isinstance(arm.pattern, Identifier):
                 covered_variants.add(arm.pattern.name)
-
-        if has_wildcard:
-            return
-
         missing = set(all_variants) - covered_variants
         if missing:
             raise RuntimeError_(
                 f"Non-exhaustive match on enum '{enum_name}'. "
                 f"Missing variants: {', '.join(sorted(missing))}. "
-                f"Add missing cases or use '_' wildcard."
-            )
+                f"Add missing cases or use '_' wildcard.")
 
     def _pattern_matches(
         self, value: Any, pattern: Any, env: Environment, bindings: dict | None = None

@@ -300,6 +300,27 @@ class MemberMixin:
                     (yes if self._call_function(args[0], [item]) else no).append(item)
                 return [yes, no]
             return ('builtin', _arr_partition)
+        if member == 'findLast':
+            def _arr_find_last(args, ctx):
+                for item in reversed(obj):
+                    if self._call_function(args[0], [item]):
+                        return item
+                return None
+            return ('builtin', _arr_find_last)
+        if member == 'findLastIndex':
+            def _arr_find_last_index(args, ctx):
+                for i in range(len(obj) - 1, -1, -1):
+                    if self._call_function(args[0], [obj[i]]):
+                        return i
+                return -1
+            return ('builtin', _arr_find_last_index)
+        if member == 'tally':
+            def _arr_tally(args, ctx):
+                counts = {}
+                for item in obj:
+                    counts[item] = counts.get(item, 0) + 1
+                return counts
+            return ('builtin', _arr_tally)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -409,6 +430,11 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: int(obj) % 2 != 0)
         if member == 'clamp':
             return ('builtin', lambda args, ctx: max(args[0], min(obj, args[1])))
+        if member == 'toFixed':
+            def _to_fixed(args, ctx):
+                digits = int(args[0])
+                return f"{obj:.{digits}f}"
+            return ('builtin', _to_fixed)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
