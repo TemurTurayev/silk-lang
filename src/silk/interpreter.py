@@ -62,6 +62,11 @@ class Interpreter(MemberMixin):
         # Register None as a SilkOption
         self.global_env.define('None', SilkOption(is_some=False), mutable=False)
 
+        # Array namespace with static methods
+        array_ns = Environment()
+        array_ns.define('filled', ('builtin', lambda args, ctx: [args[1]] * int(args[0])), mutable=False)
+        self.global_env.define('Array', array_ns, mutable=False)
+
     def run(self, source: str, file_path: Path | None = None) -> bool:
         """Run Silk source code."""
         self._current_file = file_path

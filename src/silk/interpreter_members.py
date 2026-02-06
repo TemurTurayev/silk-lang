@@ -495,6 +495,11 @@ class MemberMixin:
                 other = args[0]
                 return [x for x in obj if x not in other] + [x for x in other if x not in obj]
             return ('builtin', _arr_sym_diff)
+        if member == 'at':
+            def _arr_at(args, ctx):
+                idx = int(args[0])
+                return obj[idx] if -len(obj) <= idx < len(obj) else None
+            return ('builtin', _arr_at)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -634,6 +639,13 @@ class MemberMixin:
                     return obj
                 return char * (len(obj) - keep) + obj[-keep:]
             return ('builtin', _mask)
+        if member == 'at':
+            def _str_at(args, ctx):
+                idx = int(args[0])
+                return obj[idx] if -len(obj) <= idx < len(obj) else None
+            return ('builtin', _str_at)
+        if member == 'replaceFirst':
+            return ('builtin', lambda args, ctx: obj.replace(args[0], args[1], 1))
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
