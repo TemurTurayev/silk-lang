@@ -321,6 +321,19 @@ class MemberMixin:
                     counts[item] = counts.get(item, 0) + 1
                 return counts
             return ('builtin', _arr_tally)
+        if member == 'flatten':
+            def _arr_flatten(args, ctx):
+                depth = int(args[0]) if args else 1
+                def _flat(arr, d):
+                    result = []
+                    for item in arr:
+                        if isinstance(item, list) and d > 0:
+                            result.extend(_flat(item, d - 1))
+                        else:
+                            result.append(item)
+                    return result
+                return _flat(obj, depth)
+            return ('builtin', _arr_flatten)
         if member == 'takeWhile':
             def _arr_take_while(args, ctx):
                 result = []
@@ -439,6 +452,22 @@ class MemberMixin:
                     result = result.replace('{}', silk_repr(arg), 1)
                 return result
             return ('builtin', _format)
+        if member == 'removePrefix':
+            def _remove_prefix(args, ctx):
+                return obj[len(args[0]):] if obj.startswith(args[0]) else obj
+            return ('builtin', _remove_prefix)
+        if member == 'removeSuffix':
+            def _remove_suffix(args, ctx):
+                return obj[:-len(args[0])] if obj.endswith(args[0]) else obj
+            return ('builtin', _remove_suffix)
+        if member == 'truncate':
+            def _truncate(args, ctx):
+                max_len = int(args[0])
+                suffix = args[1] if len(args) > 1 else ""
+                if len(obj) <= max_len:
+                    return obj
+                return obj[:max_len - len(suffix)] + suffix
+            return ('builtin', _truncate)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -464,6 +493,12 @@ class MemberMixin:
                 digits = int(args[0])
                 return f"{obj:.{digits}f}"
             return ('builtin', _to_fixed)
+        if member == 'pow':
+            return ('builtin', lambda args, ctx: obj ** int(args[0]))
+        if member == 'sqrt':
+            return ('builtin', lambda args, ctx: math.sqrt(obj))
+        if member == 'sign':
+            return ('builtin', lambda args, ctx: (1 if obj > 0 else (-1 if obj < 0 else 0)))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
