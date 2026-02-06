@@ -183,6 +183,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'countValues':
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
+        if member == 'keyOf':
+            return ('builtin', lambda args, ctx: next((k for k, v in obj.items() if v == args[0]), None))
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -200,6 +202,7 @@ class MemberMixin:
             'isEmpty': lambda: len(obj) == 0, 'compact': lambda: [x for x in obj if x is not None],
             'enumerate': lambda: [[i, v] for i, v in enumerate(obj)],
             'pairwise': lambda: [[obj[i], obj[i + 1]] for i in range(len(obj) - 1)],
+            'prefixes': lambda: [obj[:i+1] for i in range(len(obj))],
             'toString': lambda: silk_repr(obj),
             'zipWithIndex': lambda: [[v, i] for i, v in enumerate(obj)],
         }
@@ -575,48 +578,35 @@ class MemberMixin:
                 return obj[:i] if member == 'commonPrefix' else (obj[len(obj)-i:] if i else '')
             return ('builtin', _common)
         if member == 'levenshtein':
-            def _levenshtein(args, ctx):
-                other = args[0]
-                m, n = len(obj), len(other)
-                if m == 0:
-                    return n
-                if n == 0:
-                    return m
-                prev = list(range(n + 1))
+            def _lev(args, ctx):
+                o, m, n = args[0], len(obj), len(args[0])
+                if not m or not n: return m or n
+                p = list(range(n + 1))
                 for i in range(1, m + 1):
-                    curr = [i] + [0] * n
-                    for j in range(1, n + 1):
-                        cost = 0 if obj[i-1] == other[j-1] else 1
-                        curr[j] = min(curr[j-1] + 1, prev[j] + 1, prev[j-1] + cost)
-                    prev = curr
-                return prev[n]
-            return ('builtin', _levenshtein)
+                    c = [i] + [0] * n
+                    for j in range(1, n + 1): c[j] = min(c[j-1] + 1, p[j] + 1, p[j-1] + (0 if obj[i-1] == o[j-1] else 1))
+                    p = c
+                return p[n]
+            return ('builtin', _lev)
         if member == 'hamming':
             return ('builtin', lambda args, ctx: sum(a != b for a, b in zip(obj, args[0])))
         if member == 'soundex':
-            def _soundex(args, ctx):
-                if not obj:
-                    return ''
-                _c = {c: d for d, chars in enumerate('AEIOUYHW,BFPV,CGJKQSXZ,DT,L,MN,R'.split(','))
-                      for c in chars}
-                result, prev = obj[0].upper(), _c.get(obj[0].upper(), 0)
+            def _sx(args, ctx):
+                if not obj: return ''
+                _c = {c: d for d, cs in enumerate('AEIOUYHW,BFPV,CGJKQSXZ,DT,L,MN,R'.split(',')) for c in cs}
+                r, p = obj[0].upper(), _c.get(obj[0].upper(), 0)
                 for ch in obj[1:]:
-                    code = _c.get(ch.upper(), 0)
-                    if code > 0 and code != prev:
-                        result += str(code)
-                    prev = code if code > 0 else prev
-                return (result + '000')[:4]
-            return ('builtin', _soundex)
+                    cd = _c.get(ch.upper(), 0)
+                    if cd > 0 and cd != p: r += str(cd)
+                    p = cd if cd > 0 else p
+                return (r + '000')[:4]
+            return ('builtin', _sx)
         if member == 'isUrl':
             return ('builtin', lambda args, ctx: obj.startswith(('http://', 'https://')) and '.' in obj.split('//')[1])
         if member == 'caesar':
             return ('builtin', lambda args, ctx: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + int(args[0])) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj))
         if member == 'charFrequency':
-            def _cf(args, ctx):
-                f = {}
-                for c in obj: f[c] = f.get(c, 0) + 1
-                return f
-            return ('builtin', _cf)
+            return ('builtin', lambda args, ctx: (lambda f: [f.update({c: f.get(c, 0) + 1}) for c in obj] and f or f)({}))
         if member == 'dedent':
             def _dedent(args, ctx):
                 lines = obj.split('\n')
@@ -637,6 +627,14 @@ class MemberMixin:
         if member == 'matchCount':
             import re as _re
             return ('builtin', lambda args, ctx: len(_re.findall(args[0], obj)))
+        if member == 'isBalanced':
+            def _ib(args, ctx):
+                s, m = [], {')': '(', ']': '[', '}': '{'}
+                for c in obj:
+                    if c in '([{': s.append(c)
+                    elif c in ')]}' and (not s or s.pop() != m[c]): return False
+                return not s
+            return ('builtin', _ib)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -667,6 +665,7 @@ class MemberMixin:
             'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9,
             'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
             'sumTo': lambda: int(obj) * (int(obj) + 1) // 2,
+            'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj),
         }
         if member in _simple:
             fn = _simple[member]
