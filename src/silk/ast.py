@@ -116,6 +116,14 @@ class IndexAssign:
 
 
 @dataclass
+class MemberAssign:
+    """Member assignment: obj.field = value."""
+    obj: Any
+    member: str
+    value: Any
+
+
+@dataclass
 class LetDeclaration:
     """Variable declaration: let name = value."""
     name: str
@@ -345,3 +353,15 @@ class ThrowStatement:
 class HashMapLiteral:
     """HashMap literal: {"key": value, ...} or {:} for empty."""
     pairs: list  # list of (key_expr, value_expr) tuples
+
+
+# ═══════════════════════════════════════════════════════════
+# TERNARY / CONDITIONAL EXPRESSION
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class TernaryExpr:
+    """Ternary expression: if condition then expr else expr."""
+    condition: Any
+    then_expr: Any
+    else_expr: Any

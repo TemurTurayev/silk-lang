@@ -22,7 +22,7 @@ from .ast import (
     MemberAccess, StructDef, StructInstance, EnumDef,
     MatchExpr, MatchArm, ImplBlock, InterfaceDef, ImportStmt,
     TestBlock, AssertStatement, StringInterp, TryCatch,
-    HashMapLiteral, ThrowStatement
+    HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -102,6 +102,22 @@ class Interpreter:
                 obj[idx] = val
             else:
                 raise RuntimeError_("Index assignment only works on arrays and maps")
+
+        elif isinstance(node, MemberAssign):
+            obj = self.evaluate(node.obj, env)
+            val = self.evaluate(node.value, env)
+            if isinstance(obj, SilkStruct):
+                if node.member not in obj.fields:
+                    raise RuntimeError_(
+                        f"Struct '{obj.struct_name}' has no field '{node.member}'"
+                    )
+                obj.fields[node.member] = val
+            elif isinstance(obj, dict):
+                obj[node.member] = val
+            else:
+                raise RuntimeError_(
+                    f"Cannot assign to member '{node.member}' on {type(obj).__name__}"
+                )
 
         elif isinstance(node, IfStatement):
             cond = self.evaluate(node.condition, env)
@@ -305,6 +321,12 @@ class Interpreter:
                 val = self.evaluate(val_expr, env)
                 result[key] = val
             return result
+        elif isinstance(node, TernaryExpr):
+            cond = self.evaluate(node.condition, env)
+            if truthy(cond):
+                return self.evaluate(node.then_expr, env)
+            else:
+                return self.evaluate(node.else_expr, env)
         elif isinstance(node, FunctionDef):
             return ('function', node.params, node.body, env)
         else:
@@ -386,8 +408,15 @@ class Interpreter:
             elif func[0] == 'function':
                 _, params, body, closure_env = func
                 fn_env = Environment(parent=closure_env)
-                for (pname, _), arg in zip(params, args):
-                    fn_env.define(pname, arg)
+                for i, param in enumerate(params):
+                    pname = param[0]
+                    if i < len(args):
+                        fn_env.define(pname, args[i])
+                    elif len(param) >= 3 and param[2] is not None:
+                        default_val = self.evaluate(param[2], closure_env)
+                        fn_env.define(pname, default_val)
+                    else:
+                        fn_env.define(pname, None)
                 try:
                     self.execute_block(body, fn_env)
                 except ReturnSignal as r:
@@ -619,6 +648,13 @@ class Interpreter:
                         self._call_function(args[0], [item])
                     return None
                 return ('builtin', _arr_foreach)
+            if member == 'reduce':
+                def _arr_reduce(args, ctx):
+                    acc = args[1]
+                    for item in obj:
+                        acc = self._call_function(args[0], [acc, item])
+                    return acc
+                return ('builtin', _arr_reduce)
 
         elif isinstance(obj, str):
             if member == 'length':

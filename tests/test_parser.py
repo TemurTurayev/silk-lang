@@ -191,7 +191,7 @@ class TestFunctions:
         ast = parse("fn add(a: int, b: int) -> int { return a + b }")
         fn = ast.statements[0]
         assert fn.return_type == 'int'
-        assert fn.params[0] == ('a', 'int')
+        assert fn.params[0] == ('a', 'int', None)
 
     def test_function_call(self):
         ast = parse("add(1, 2)")

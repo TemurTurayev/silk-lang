@@ -64,7 +64,7 @@ impl Data {
         method = impl.methods[0]
         assert isinstance(method, FunctionDef)
         assert method.name == "get_value"
-        assert method.params[0] == ("self", None)
+        assert method.params[0] == ("self", None, None)
 
     def test_impl_method_with_params(self):
         ast = parse("""
@@ -78,8 +78,8 @@ impl Counter {
         impl = ast.statements[1]
         method = impl.methods[0]
         assert len(method.params) == 2
-        assert method.params[0] == ("self", None)
-        assert method.params[1] == ("n", "int")
+        assert method.params[0] == ("self", None, None)
+        assert method.params[1] == ("n", "int", None)
 
 
 class TestImplExecution:

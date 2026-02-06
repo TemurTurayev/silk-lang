@@ -16,7 +16,7 @@ from .ast import (
     EnumDef, EnumVariant, MatchExpr, MatchArm, ImplBlock,
     InterfaceDef, InterfaceMethodSig, ImportStmt,
     TestBlock, AssertStatement, StringInterp, TryCatch,
-    HashMapLiteral, ThrowStatement
+    HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign
 )
 
 
@@ -187,24 +187,34 @@ class Parser:
 
         return LetDeclaration(name, mutable, type_hint, value)
 
+    def _parse_params(self) -> list:
+        """Parse function parameter list (inside parens).
+
+        Returns list of (name, type_hint, default_expr) tuples.
+        """
+        params = []
+        while not self.match(TokenType.RPAREN):
+            pname = self.eat(TokenType.IDENTIFIER).value
+            ptype = None
+            default = None
+            if self.match(TokenType.COLON):
+                self.eat(TokenType.COLON)
+                ptype = self.current().value
+                self.pos += 1
+            if self.match(TokenType.ASSIGN):
+                self.eat(TokenType.ASSIGN)
+                default = self.parse_expression()
+            params.append((pname, ptype, default))
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+        return params
+
     def parse_function_def(self) -> FunctionDef:
         """Parse function definition."""
         self.eat(TokenType.FN)
         name = self.eat(TokenType.IDENTIFIER).value
         self.eat(TokenType.LPAREN)
-
-        params = []
-        while not self.match(TokenType.RPAREN):
-            pname = self.eat(TokenType.IDENTIFIER).value
-            ptype = None
-            if self.match(TokenType.COLON):
-                self.eat(TokenType.COLON)
-                ptype = self.current().value
-                self.pos += 1
-            params.append((pname, ptype))
-            if self.match(TokenType.COMMA):
-                self.eat(TokenType.COMMA)
-
+        params = self._parse_params()
         self.eat(TokenType.RPAREN)
 
         return_type = None
@@ -216,10 +226,19 @@ class Parser:
         body = self.parse_block()
         return FunctionDef(name, params, return_type, body)
 
-    def parse_if(self) -> IfStatement:
-        """Parse if/elif/else statement."""
+    def parse_if(self):
+        """Parse if/elif/else statement or ternary expression."""
         self.eat(TokenType.IF)
         condition = self.parse_expression()
+
+        # Ternary form: if cond then expr else expr
+        if self.match(TokenType.THEN):
+            self.eat(TokenType.THEN)
+            then_expr = self.parse_expression()
+            self.eat(TokenType.ELSE)
+            else_expr = self.parse_expression()
+            return TernaryExpr(condition, then_expr, else_expr)
+
         body = self.parse_block()
 
         elif_branches = []
@@ -544,6 +563,12 @@ class Parser:
             value = self.parse_expression()
             return IndexAssign(expr.obj, expr.index, value)
 
+        # Member assignment: obj.field = val
+        if isinstance(expr, MemberAccess) and self.match(TokenType.ASSIGN):
+            self.eat(TokenType.ASSIGN)
+            value = self.parse_expression()
+            return MemberAssign(expr.obj, expr.member, value)
+
         return expr
 
     # ═══════════════════════════════════════════════════════════
@@ -735,6 +760,9 @@ class Parser:
         elif t.type == TokenType.LBRACE and self.is_hashmap_start():
             return self.parse_hashmap()
 
+        elif t.type == TokenType.IF:
+            return self.parse_if()
+
         elif t.type == TokenType.MATCH:
             return self.parse_match()
 
@@ -755,18 +783,7 @@ class Parser:
         """Parse anonymous function: fn(params) { body }"""
         self.eat(TokenType.FN)
         self.eat(TokenType.LPAREN)
-
-        params = []
-        while not self.match(TokenType.RPAREN):
-            pname = self.eat(TokenType.IDENTIFIER).value
-            ptype = None
-            if self.match(TokenType.COLON):
-                self.eat(TokenType.COLON)
-                ptype = self.current().value
-                self.pos += 1
-            params.append((pname, ptype))
-            if self.match(TokenType.COMMA):
-                self.eat(TokenType.COMMA)
+        params = self._parse_params()
         self.eat(TokenType.RPAREN)
 
         return_type = None

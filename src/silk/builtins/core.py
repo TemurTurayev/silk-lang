@@ -250,6 +250,18 @@ def builtin_err(args: list, context: dict) -> Any:
     return SilkResult(error=args[0], is_ok=False)
 
 
+def builtin_reduce(args: list, context: dict) -> Any:
+    """Reduce an array: reduce(arr, fn(acc, item), initial)."""
+    arr, func, initial = args[0], args[1], args[2]
+    if not isinstance(arr, list):
+        raise RuntimeError_("reduce() expects an array as first argument")
+    call = context['call_function']
+    acc = initial
+    for item in arr:
+        acc = call(func, [acc, item])
+    return acc
+
+
 # Export all core built-ins
 CORE_BUILTINS: dict[str, Callable] = {
     'print': builtin_print,
@@ -275,4 +287,5 @@ CORE_BUILTINS: dict[str, Callable] = {
     'Some': builtin_some,
     'Ok': builtin_ok,
     'Err': builtin_err,
+    'reduce': builtin_reduce,
 }
