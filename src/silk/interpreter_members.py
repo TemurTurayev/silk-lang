@@ -183,6 +183,8 @@ class MemberMixin:
             return ('builtin', _dm)
         if member == 'renameKey':
             return ('builtin', lambda args, ctx: {(args[1] if k == args[0] else k): v for k, v in obj.items()})
+        if member == 'selectKeys':
+            return ('builtin', lambda args, ctx: {k: obj[k] for k in args[0] if k in obj})
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -326,51 +328,39 @@ class MemberMixin:
                 return c
             return ('builtin', _tally)
         if member == 'interleave':
-            def _interleave(args, ctx):
-                other, result, i, j = args[0], [], 0, 0
-                while i < len(obj) or j < len(other):
-                    if i < len(obj):
-                        result.append(obj[i]); i += 1
-                    if j < len(other):
-                        result.append(other[j]); j += 1
-                return result
-            return ('builtin', _interleave)
+            def _il(args, ctx):
+                o, r = args[0], []
+                for i in range(max(len(obj), len(o))):
+                    if i < len(obj): r.append(obj[i])
+                    if i < len(o): r.append(o[i])
+                return r
+            return ('builtin', _il)
         if member == 'flatten':
             def _flatten(args, ctx):
-                depth = int(args[0]) if args else 1
-                def _f(arr, d):
-                    result = []
-                    for item in arr:
-                        if isinstance(item, list) and d > 0:
-                            result.extend(_f(item, d - 1))
-                        else:
-                            result.append(item)
-                    return result
-                return _f(obj, depth)
+                d = int(args[0]) if args else 1
+                def _f(a, d):
+                    return [x for i in a for x in (_f(i, d-1) if isinstance(i, list) and d > 0 else [i])]
+                return _f(obj, d)
             return ('builtin', _flatten)
         if member == 'takeWhile':
             def _tw(args, ctx):
-                result = []
-                for item in obj:
-                    if not self._call_function(args[0], [item]):
-                        break
-                    result.append(item)
-                return result
+                r = []
+                for x in obj:
+                    if not self._call_function(args[0], [x]): break
+                    r.append(x)
+                return r
             return ('builtin', _tw)
         if member == 'skipWhile':
             def _sw(args, ctx):
                 i = 0
-                while i < len(obj) and self._call_function(args[0], [obj[i]]):
-                    i += 1
+                while i < len(obj) and self._call_function(args[0], [obj[i]]): i += 1
                 return obj[i:]
             return ('builtin', _sw)
         if member == 'scan':
             def _scan(args, ctx):
-                result, acc = [], args[1]
-                for item in obj:
-                    acc = self._call_function(args[0], [acc, item])
-                    result.append(acc)
-                return result
+                r, acc = [], args[1]
+                for x in obj: acc = self._call_function(args[0], [acc, x]); r.append(acc)
+                return r
             return ('builtin', _scan)
         if member == 'product':
             def _product(args, ctx):
@@ -487,6 +477,12 @@ class MemberMixin:
             return ('builtin', _cb)
         if member == 'sliding':
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj) - int(args[0]) + 1, int(args[1]))])
+        if member == 'span':
+            def _span(args, ctx):
+                i = 0
+                while i < len(obj) and self._call_function(args[0], [obj[i]]): i += 1
+                return [obj[:i], obj[i:]]
+            return ('builtin', _span)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -515,6 +511,7 @@ class MemberMixin:
             'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'codePoints': lambda: [ord(c) for c in obj],
             'isHexColor': lambda: bool(__import__('re').match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', obj)),
             'normalize': lambda: ' '.join(obj.split()),
+            'isIPv4': lambda: len(p := obj.split('.')) == 4 and all(s.isdigit() and 0 <= int(s) <= 255 for s in p),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -780,6 +777,9 @@ class MemberMixin:
                     seen.add(n); n = sum(int(d) ** 2 for d in str(n))
                 return n == 1
             return ('builtin', _ih)
+        if member == 'toFraction':
+            from fractions import Fraction as _F
+            return ('builtin', lambda args, ctx: str(_F(obj).limit_denominator()))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
