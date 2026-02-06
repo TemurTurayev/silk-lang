@@ -208,6 +208,13 @@ class MemberMixin:
             def _count(args, ctx):
                 return sum(1 for k, v in obj.items() if self._call_function(args[0], [k, v]))
             return ('builtin', _count)
+        if member == 'flatMap':
+            def _flatmap(args, ctx):
+                result = []
+                for k, v in obj.items():
+                    result.extend(self._call_function(args[0], [k, v]))
+                return result
+            return ('builtin', _flatmap)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -603,6 +610,7 @@ class MemberMixin:
             'center': lambda a: obj.center(int(a[0]), a[1]),
             'wrap': lambda a: a[0] + obj + a[1],
             'mask': lambda a: a[0] * (len(obj) - int(a[1])) + obj[-int(a[1]):] if len(obj) > int(a[1]) else obj,
+            'padCenter': lambda a: obj.center(int(a[0]), a[1]),
         }
         if member in _twoarg:
             fn = _twoarg[member]
@@ -691,6 +699,7 @@ class MemberMixin:
             'factorial': lambda: math.factorial(int(obj)),
             'toBinary': lambda: bin(int(obj))[2:],
             'toHex': lambda: hex(int(obj))[2:],
+            'toChar': lambda: chr(int(obj)),
         }
         if member in _simple:
             fn = _simple[member]
