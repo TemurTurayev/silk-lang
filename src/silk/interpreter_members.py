@@ -183,6 +183,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'countValues':
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
+        if member == 'swapKeyValue':
+            return ('builtin', lambda args, ctx: {v: k for k, v in obj.items()})
         if member == 'withDefaults':
             return ('builtin', lambda args, ctx: {**args[0], **obj})
         if member == 'keyOf':
@@ -206,6 +208,7 @@ class MemberMixin:
             'pairwise': lambda: [[obj[i], obj[i + 1]] for i in range(len(obj) - 1)],
             'prefixes': lambda: [obj[:i+1] for i in range(len(obj))],
             'suffixes': lambda: [obj[i:] for i in range(len(obj))],
+            'dedup': lambda: [obj[i] for i in range(len(obj)) if i == 0 or obj[i] != obj[i-1]],
             'toString': lambda: silk_repr(obj),
             'zipWithIndex': lambda: [[v, i] for i, v in enumerate(obj)],
         }
@@ -491,6 +494,7 @@ class MemberMixin:
             'isIPv4': lambda: len(p := obj.split('.')) == 4 and all(s.isdigit() and 0 <= int(s) <= 255 for s in p),
             'isPangram': lambda: set('abcdefghijklmnopqrstuvwxyz').issubset(obj.lower()),
             'collapseWhitespace': lambda: ' '.join(obj.split()),
+            'reverseWords': lambda: ' '.join(obj.split()[::-1]),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -670,6 +674,7 @@ class MemberMixin:
             'sumTo': lambda: int(obj) * (int(obj) + 1) // 2,
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj),
             'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
+            'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
         }
         if member in _simple:
             fn = _simple[member]
@@ -702,20 +707,16 @@ class MemberMixin:
         if member == 'isPrime':
             return ('builtin', lambda args, ctx: int(obj) >= 2 and all(int(obj) % i for i in range(2, int(int(obj)**0.5) + 1)))
         if member == 'toRoman':
-            def _roman(args, ctx):
-                n, result = int(obj), ''
-                for val, sym in [(1000,'M'),(900,'CM'),(500,'D'),(400,'CD'),(100,'C'),
-                    (90,'XC'),(50,'L'),(40,'XL'),(10,'X'),(9,'IX'),(5,'V'),(4,'IV'),(1,'I')]:
-                    while n >= val:
-                        result += sym
-                        n -= val
-                return result
-            return ('builtin', _roman)
+            def _rm(args, ctx):
+                n, r = int(obj), ''
+                for v, s in [(1000,'M'),(900,'CM'),(500,'D'),(400,'CD'),(100,'C'),(90,'XC'),(50,'L'),(40,'XL'),(10,'X'),(9,'IX'),(5,'V'),(4,'IV'),(1,'I')]:
+                    while n >= v: r += s; n -= v
+                return r
+            return ('builtin', _rm)
         if member == 'fibonacci':
             def _fib(args, ctx):
                 a, b = 0, 1
-                for _ in range(int(obj)):
-                    a, b = b, a + b
+                for _ in range(int(obj)): a, b = b, a + b
                 return a
             return ('builtin', _fib)
         if member == 'toWords':
@@ -769,8 +770,7 @@ class MemberMixin:
                 while d * d <= n:
                     while n % d == 0: f.append(d); n //= d
                     d += 1
-                if n > 1: f.append(n)
-                return f
+                return f + ([n] if n > 1 else [])
             return ('builtin', _pf)
         if member == 'nextPrime':
             def _nxp(args, ctx):
