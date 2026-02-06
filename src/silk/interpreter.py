@@ -22,7 +22,8 @@ from .ast import (
     MemberAccess, StructDef, StructInstance, EnumDef,
     MatchExpr, MatchArm, ImplBlock, InterfaceDef, ImportStmt,
     TestBlock, AssertStatement, StringInterp, TryCatch,
-    HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign
+    HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
+    MemberCompoundAssign, IndexCompoundAssign
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -118,6 +119,36 @@ class Interpreter:
                 raise RuntimeError_(
                     f"Cannot assign to member '{node.member}' on {type(obj).__name__}"
                 )
+
+        elif isinstance(node, MemberCompoundAssign):
+            obj = self.evaluate(node.obj, env)
+            right = self.evaluate(node.value, env)
+            ops = {'+': lambda a, b: a + b, '-': lambda a, b: a - b,
+                   '*': lambda a, b: a * b, '/': lambda a, b: a / b}
+            if isinstance(obj, SilkStruct):
+                current = obj.fields[node.member]
+                obj.fields[node.member] = ops[node.op](current, right)
+            elif isinstance(obj, dict):
+                current = obj[node.member]
+                obj[node.member] = ops[node.op](current, right)
+            else:
+                raise RuntimeError_(
+                    f"Cannot compound-assign member '{node.member}' on {type(obj).__name__}"
+                )
+
+        elif isinstance(node, IndexCompoundAssign):
+            obj = self.evaluate(node.obj, env)
+            idx = self.evaluate(node.index, env)
+            right = self.evaluate(node.value, env)
+            ops = {'+': lambda a, b: a + b, '-': lambda a, b: a - b,
+                   '*': lambda a, b: a * b, '/': lambda a, b: a / b}
+            if isinstance(obj, list):
+                i = int(idx)
+                obj[i] = ops[node.op](obj[i], right)
+            elif isinstance(obj, dict):
+                obj[idx] = ops[node.op](obj[idx], right)
+            else:
+                raise RuntimeError_("Compound index assignment only works on arrays and maps")
 
         elif isinstance(node, IfStatement):
             cond = self.evaluate(node.condition, env)
@@ -677,6 +708,21 @@ class Interpreter:
                 return ('builtin', lambda args, ctx: obj.split(args[0] if args else " "))
             if member == 'chars':
                 return ('builtin', lambda args, ctx: list(obj))
+            if member == 'indexOf':
+                return ('builtin', lambda args, ctx: obj.find(args[0]))
+            if member == 'substring':
+                def _substring(args, ctx):
+                    start = int(args[0])
+                    if len(args) > 1:
+                        return obj[start:int(args[1])]
+                    return obj[start:]
+                return ('builtin', _substring)
+            if member == 'repeat':
+                return ('builtin', lambda args, ctx: obj * int(args[0]))
+            if member == 'padStart':
+                return ('builtin', lambda args, ctx: obj.rjust(int(args[0]), args[1]))
+            if member == 'padEnd':
+                return ('builtin', lambda args, ctx: obj.ljust(int(args[0]), args[1]))
 
         raise RuntimeError_(f"'{type(obj).__name__}' has no member '{member}'")
 

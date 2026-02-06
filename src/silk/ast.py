@@ -124,6 +124,24 @@ class MemberAssign:
 
 
 @dataclass
+class MemberCompoundAssign:
+    """Compound member assignment: obj.field += value."""
+    obj: Any
+    member: str
+    op: str
+    value: Any
+
+
+@dataclass
+class IndexCompoundAssign:
+    """Compound index assignment: arr[i] += value."""
+    obj: Any
+    index: Any
+    op: str
+    value: Any
+
+
+@dataclass
 class LetDeclaration:
     """Variable declaration: let name = value."""
     name: str
