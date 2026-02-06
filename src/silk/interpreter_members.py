@@ -6,6 +6,8 @@ Handles member access and method calls on built-in types
 """
 
 import math
+import random
+import json
 from typing import Any
 
 from .errors import RuntimeError_
@@ -166,6 +168,22 @@ class MemberMixin:
             def _map_keys(args, ctx):
                 return {self._call_function(args[0], [k]): v for k, v in obj.items()}
             return ('builtin', _map_keys)
+        if member == 'toJson':
+            def _to_json(args, ctx):
+                def _convert(v):
+                    if v is None:
+                        return None
+                    if isinstance(v, bool):
+                        return v
+                    if isinstance(v, (int, float, str)):
+                        return v
+                    if isinstance(v, list):
+                        return [_convert(i) for i in v]
+                    if isinstance(v, dict):
+                        return {str(k): _convert(val) for k, val in v.items()}
+                    return str(v)
+                return json.dumps(_convert(obj))
+            return ('builtin', _to_json)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -440,6 +458,24 @@ class MemberMixin:
             def _arr_reject(args, ctx):
                 return [item for item in obj if not self._call_function(args[0], [item])]
             return ('builtin', _arr_reject)
+        if member == 'intersection':
+            return ('builtin', lambda args, ctx: [x for x in obj if x in args[0]])
+        if member == 'union':
+            def _arr_union(args, ctx):
+                seen = []
+                for item in obj + args[0]:
+                    if item not in seen:
+                        seen.append(item)
+                return seen
+            return ('builtin', _arr_union)
+        if member == 'sample':
+            return ('builtin', lambda args, ctx: random.sample(list(obj), min(int(args[0]), len(obj))))
+        if member == 'shuffle':
+            def _arr_shuffle(args, ctx):
+                copy = list(obj)
+                random.shuffle(copy)
+                return copy
+            return ('builtin', _arr_shuffle)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -565,6 +601,8 @@ class MemberMixin:
             return ('builtin', _is_numeric)
         if member == 'wrap':
             return ('builtin', lambda args, ctx: args[0] + obj + args[1])
+        if member == 'lastIndexOf':
+            return ('builtin', lambda args, ctx: obj.rfind(args[0]))
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
