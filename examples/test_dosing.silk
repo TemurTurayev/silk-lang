@@ -1,0 +1,35 @@
+// Medical dosing validation tests
+// Run with: silk test examples/test_dosing.silk
+
+fn dose_per_weight(mg_per_kg, weight_kg) {
+    return mg_per_kg * weight_kg
+}
+
+fn clamp_dose(dose, max_dose) {
+    if dose > max_dose {
+        return max_dose
+    }
+    return dose
+}
+
+test "basic dose calculation" {
+    let dose = dose_per_weight(15.0, 25.0)
+    assert dose == 375
+}
+
+test "dose clamping at max" {
+    let dose = dose_per_weight(25.0, 30.0)
+    let clamped = clamp_dose(dose, 500.0)
+    assert clamped == 500
+}
+
+test "dose under max passes through" {
+    let dose = dose_per_weight(10.0, 20.0)
+    let clamped = clamp_dose(dose, 500.0)
+    assert clamped == 200
+}
+
+test "zero weight gives zero dose" {
+    let dose = dose_per_weight(15.0, 0.0)
+    assert dose == 0
+}

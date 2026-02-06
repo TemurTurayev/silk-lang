@@ -14,7 +14,8 @@ from .ast import (
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructField, StructInstance,
     EnumDef, EnumVariant, MatchExpr, MatchArm, ImplBlock,
-    InterfaceDef, InterfaceMethodSig, ImportStmt
+    InterfaceDef, InterfaceMethodSig, ImportStmt,
+    TestBlock, AssertStatement, StringInterp
 )
 
 
@@ -126,6 +127,10 @@ class Parser:
             return self.parse_interface_def()
         elif t.type == TokenType.IMPORT:
             return self.parse_import()
+        elif t.type == TokenType.TEST:
+            return self.parse_test_block()
+        elif t.type == TokenType.ASSERT:
+            return self.parse_assert()
         else:
             return self.parse_expression_statement()
 
@@ -391,6 +396,19 @@ class Parser:
             alias = self.eat(TokenType.IDENTIFIER).value
 
         return ImportStmt(path, alias)
+
+    def parse_test_block(self) -> TestBlock:
+        """Parse test block: test "name" { body }"""
+        self.eat(TokenType.TEST)
+        name = self.eat(TokenType.STRING).value
+        body = self.parse_block()
+        return TestBlock(name, body)
+
+    def parse_assert(self) -> AssertStatement:
+        """Parse assert statement: assert expression"""
+        self.eat(TokenType.ASSERT)
+        expression = self.parse_expression()
+        return AssertStatement(expression)
 
     def parse_match(self) -> MatchExpr:
         """Parse match expression."""
@@ -661,11 +679,55 @@ class Parser:
         elif t.type == TokenType.MATCH:
             return self.parse_match()
 
+        elif t.type == TokenType.FSTRING:
+            return self.parse_fstring()
+
         else:
             raise ParseError(
                 f"Unexpected token: {t.type.name} ({t.value!r})",
                 t.line, t.col
             )
+
+    def parse_fstring(self) -> StringInterp:
+        """Parse f-string into alternating string/expression parts.
+
+        The FSTRING token value is a raw template like: "hello {name}, age {age}"
+        We split on { } to extract expressions, then lex+parse each one.
+        """
+        template = self.eat(TokenType.FSTRING).value
+        parts = []
+        i = 0
+
+        while i < len(template):
+            if template[i] == '{':
+                # Find matching closing brace
+                depth = 1
+                start = i + 1
+                i += 1
+                while i < len(template) and depth > 0:
+                    if template[i] == '{':
+                        depth += 1
+                    elif template[i] == '}':
+                        depth -= 1
+                    i += 1
+                expr_src = template[start:i - 1]
+                # Lex and parse the expression
+                from .lexer import Lexer
+                expr_tokens = Lexer(expr_src).tokenize()
+                expr_parser = Parser(expr_tokens)
+                expr_node = expr_parser.parse_expression()
+                parts.append(expr_node)
+            else:
+                # Collect literal text until next { or end
+                start = i
+                while i < len(template) and template[i] != '{':
+                    i += 1
+                parts.append(StringLiteral(template[start:i]))
+
+        if not parts:
+            parts.append(StringLiteral(""))
+
+        return StringInterp(parts)
 
     def parse_array_literal(self) -> ArrayLiteral:
         """Parse array literal [...]."""

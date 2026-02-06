@@ -4,6 +4,7 @@ Silk CLI - Command Line Interface
 
 Usage:
     silk run <file.silk>     Run a Silk program
+    silk test <file.silk>    Run tests in a Silk file
     silk repl                Start interactive REPL
     silk --version           Show version
     silk --help              Show help
@@ -183,6 +184,45 @@ def run_file(filepath: str) -> bool:
     return interpreter.run(source, file_path=file_path)
 
 
+def test_file(filepath: str) -> bool:
+    """Run tests in a Silk source file."""
+    from pathlib import Path
+
+    file_path = Path(filepath).resolve()
+    if not file_path.exists():
+        print(f"❌ File not found: {filepath}")
+        return False
+
+    source = file_path.read_text(encoding='utf-8')
+    interpreter = Interpreter()
+
+    print(f"\033[96mRunning tests in {file_path.name}...\033[0m\n")
+
+    try:
+        results = interpreter.run_tests(source, file_path=file_path)
+    except Exception as e:
+        print(f"\n\033[91m❌ Error: {e}\033[0m")
+        return False
+
+    # Print captured output
+    for line in interpreter.output_lines:
+        if line.startswith("  PASS:"):
+            print(f"\033[92m  ✓ {line[8:]}\033[0m")
+        elif line.startswith("  FAIL:"):
+            print(f"\033[91m  ✗ {line[8:]}\033[0m")
+        elif line.startswith("    "):
+            print(f"\033[91m{line}\033[0m")
+        else:
+            print(line)
+
+    if results['failed'] == 0 and results['total'] > 0:
+        print(f"\n\033[92m✓ All {results['total']} tests passed!\033[0m")
+    elif results['total'] == 0:
+        print("\033[93m⚠ No tests found.\033[0m")
+
+    return results['failed'] == 0
+
+
 def show_help():
     """Show CLI help."""
     print(f"""
@@ -191,6 +231,7 @@ Simple • Intuitive • Lightweight • Keen
 
 Usage:
     silk run <file.silk>     Run a Silk program
+    silk test <file.silk>    Run tests in a Silk file
     silk repl                Start interactive REPL
     silk                     Start interactive REPL (default)
     silk --version, -v       Show version
@@ -198,6 +239,7 @@ Usage:
 
 Examples:
     silk run hello.silk      Run hello.silk
+    silk test tests.silk     Run tests in tests.silk
     silk repl                Start REPL
     silk                     Start REPL
 """)
@@ -227,6 +269,14 @@ def main():
             print("❌ Missing file argument. Usage: silk run <file.silk>")
             sys.exit(1)
         success = run_file(args[1])
+        if not success:
+            sys.exit(1)
+
+    elif cmd == 'test':
+        if len(args) < 2:
+            print("❌ Missing file argument. Usage: silk test <file.silk>")
+            sys.exit(1)
+        success = test_file(args[1])
         if not success:
             sys.exit(1)
 

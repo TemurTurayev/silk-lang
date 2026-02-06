@@ -43,6 +43,9 @@ class TokenType(Enum):
     IMPL = auto()
     INTERFACE = auto()
     AS = auto()
+    TEST = auto()
+    ASSERT = auto()
+    FSTRING = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -115,6 +118,8 @@ KEYWORDS: dict[str, TokenType] = {
     'impl': TokenType.IMPL,
     'interface': TokenType.INTERFACE,
     'as': TokenType.AS,
+    'test': TokenType.TEST,
+    'assert': TokenType.ASSERT,
 }
 
 

@@ -67,7 +67,8 @@ include = [
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+python_classes = ["Test*"]
+addopts = "-v --tb=short -W ignore::pytest.PytestCollectionWarning"
 
 [tool.coverage.run]
 source = ["src/silk"]

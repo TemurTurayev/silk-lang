@@ -20,7 +20,8 @@ from .ast import (
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructInstance, EnumDef,
-    MatchExpr, MatchArm, ImplBlock, InterfaceDef, ImportStmt
+    MatchExpr, MatchArm, ImplBlock, InterfaceDef, ImportStmt,
+    TestBlock, AssertStatement, StringInterp
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -321,6 +322,13 @@ class Interpreter:
         elif isinstance(node, ImportStmt):
             self._execute_import(node, env)
 
+        elif isinstance(node, TestBlock):
+            # In normal mode, skip test blocks (they're only run by run_tests)
+            pass
+
+        elif isinstance(node, AssertStatement):
+            self._execute_assert(node, env)
+
         else:
             # Expression statement
             self.evaluate(node, env)
@@ -395,6 +403,15 @@ class Interpreter:
             return SilkStruct(node.struct_name, fields)
         elif isinstance(node, MatchExpr):
             return self._eval_match(node, env)
+        elif isinstance(node, StringInterp):
+            result_parts = []
+            for part in node.parts:
+                if isinstance(part, StringLiteral):
+                    result_parts.append(part.value)
+                else:
+                    val = self.evaluate(part, env)
+                    result_parts.append(silk_repr(val))
+            return ''.join(result_parts)
         else:
             raise RuntimeError_(f"Unknown AST node: {type(node).__name__}")
 
@@ -542,6 +559,74 @@ class Interpreter:
         # Bind module environment under alias
         alias = node.alias or ModuleResolver.default_alias(node.path)
         env.define(alias, self._module_cache[abs_path], mutable=False)
+
+    def _execute_assert(self, node: AssertStatement, env: Environment) -> None:
+        """Execute an assert statement."""
+        value = self.evaluate(node.expression, env)
+        if not _truthy(value):
+            # Try to produce a helpful message for comparison expressions
+            if isinstance(node.expression, BinaryOp) and node.expression.op in (
+                '==', '!=', '<', '>', '<=', '>='
+            ):
+                left = self.evaluate(node.expression.left, env)
+                right = self.evaluate(node.expression.right, env)
+                raise RuntimeError_(
+                    f"Assertion failed: {silk_repr(left)} "
+                    f"{node.expression.op} {silk_repr(right)}"
+                )
+            raise RuntimeError_("Assertion failed")
+
+    def run_tests(
+        self, source: str, file_path: Path | None = None
+    ) -> dict:
+        """Run all test blocks in source and return results.
+
+        Returns dict with: passed, failed, total, failures.
+        """
+        self._current_file = file_path
+        results = {
+            'passed': 0, 'failed': 0, 'total': 0, 'failures': []
+        }
+
+        # Parse and execute module-level code (skip test blocks)
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+        parser = Parser(tokens)
+        ast = parser.parse()
+
+        # First pass: execute non-test statements to set up module env
+        test_blocks = []
+        for stmt in ast.statements:
+            if isinstance(stmt, TestBlock):
+                test_blocks.append(stmt)
+            else:
+                self.execute(stmt, self.global_env)
+
+        results['total'] = len(test_blocks)
+
+        # Run each test in isolation
+        for test in test_blocks:
+            test_env = Environment(parent=self.global_env)
+            try:
+                self.execute_block(test.body, test_env)
+                results['passed'] += 1
+                self.output_lines.append(f"  PASS: {test.name}")
+            except (RuntimeError_, ReturnSignal) as e:
+                results['failed'] += 1
+                error_msg = str(e)
+                results['failures'].append({
+                    'name': test.name, 'error': error_msg
+                })
+                self.output_lines.append(f"  FAIL: {test.name}")
+                self.output_lines.append(f"    {error_msg}")
+
+        # Summary
+        self.output_lines.append(
+            f"\nResults: {results['passed']} passed, "
+            f"{results['failed']} failed, {results['total']} total"
+        )
+
+        return results
 
     def _load_native_module(self, path: str) -> Environment | None:
         """Load a Python-backed native module.

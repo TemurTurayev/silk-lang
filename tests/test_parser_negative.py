@@ -64,7 +64,7 @@ class TestParseErrors:
 
     def test_missing_function_body(self):
         with pytest.raises(ParseError) as exc:
-            parse("fn test()")
+            parse("fn my_func()")
         assert "LBRACE" in str(exc.value) or "{" in str(exc.value)
 
     def test_error_includes_line_col(self):

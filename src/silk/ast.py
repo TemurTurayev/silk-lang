@@ -287,3 +287,33 @@ class MatchExpr:
     """Match expression: match value { pattern => expr, ... }"""
     value: Any
     arms: list  # list of MatchArm
+
+
+# ═══════════════════════════════════════════════════════════
+# TESTING
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class AssertStatement:
+    """Assert statement: assert expression."""
+    expression: Any
+
+
+@dataclass
+class TestBlock:
+    """Test block: test "name" { body }"""
+    name: str
+    body: list  # list of statements
+
+
+# ═══════════════════════════════════════════════════════════
+# STRING INTERPOLATION
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class StringInterp:
+    """String interpolation: f"Hello {name}, age {age}"
+
+    parts is a list of StringLiteral and expression AST nodes.
+    """
+    parts: list  # alternating StringLiteral and expression nodes

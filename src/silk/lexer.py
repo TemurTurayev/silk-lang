@@ -137,6 +137,37 @@ class Lexer:
         else:
             self.add_token(TokenType.INT, int(text))
 
+    def read_fstring(self) -> None:
+        """Read an f-string: f"text {expr} text"."""
+        self.advance()  # consume 'f'
+        self.advance()  # consume '"'
+        start_line = self.line
+        result: list[str] = []
+
+        while self.pos < len(self.source):
+            ch = self.source[self.pos]
+
+            if ch == '\\':
+                self.advance()
+                if self.pos >= len(self.source):
+                    break
+                esc = self.advance()
+                escape_map = {
+                    'n': '\n', 't': '\t', 'r': '\r',
+                    '\\': '\\', '"': '"', "'": "'",
+                }
+                result.append(escape_map.get(esc, '\\' + esc))
+            elif ch == '"':
+                self.advance()
+                self.add_token(TokenType.FSTRING, ''.join(result))
+                return
+            elif ch == '\n':
+                raise LexerError("Unterminated f-string", start_line, self.col)
+            else:
+                result.append(self.advance())
+
+        raise LexerError("Unterminated f-string", start_line, self.col)
+
     def read_identifier(self) -> None:
         """Read an identifier or keyword."""
         start = self.pos
@@ -184,6 +215,9 @@ class Lexer:
 
             elif ch.isdigit():
                 self.read_number()
+
+            elif ch == 'f' and self.peek(1) == '"':
+                self.read_fstring()
 
             elif ch.isalpha() or ch == '_':
                 self.read_identifier()
