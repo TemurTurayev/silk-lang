@@ -185,6 +185,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [k for k in obj if k not in args[0]])
         if member == 'commonKeys':
             return ('builtin', lambda args, ctx: [k for k in obj if k in args[0]])
+        if member == 'valuesWhere':
+            return ('builtin', lambda args, ctx: [v for k, v in obj.items() if self._call_function(args[0], [k, v])])
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -278,21 +280,20 @@ class MemberMixin:
         if member == 'sortBy':
             return ('builtin', lambda args, ctx: sorted(obj, key=lambda item: self._call_function(args[0], [item])))
         if member == 'groupBy':
-            def _group_by(args, ctx):
-                groups = {}
-                for item in obj:
-                    key = self._call_function(args[0], [item])
-                    groups.setdefault(key, []).append(item)
-                return groups
-            return ('builtin', _group_by)
+            def _gb(args, ctx):
+                g = {}
+                for x in obj: g.setdefault(self._call_function(args[0], [x]), []).append(x)
+                return g
+            return ('builtin', _gb)
         if member in ('chunked', 'chunk'):
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj), int(args[0]))])
         if member in ('window', 'windowed'):
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(len(obj) - int(args[0]) + 1)])
         if member == 'rotate':
             def _rot(args, ctx):
-                n = int(args[0])
-                return [] if not obj else (obj[-n % len(obj):] + obj[:-n % len(obj)] if n % len(obj) else list(obj))
+                if not obj: return []
+                n = int(args[0]) % len(obj)
+                return obj[-n:] + obj[:-n] if n else list(obj)
             return ('builtin', _rot)
         if member == 'partition':
             def _part(args, ctx):
@@ -312,19 +313,14 @@ class MemberMixin:
             return ('builtin', _tally)
         if member == 'interleave':
             def _il(args, ctx):
-                o, r = args[0], []
-                for i in range(max(len(obj), len(o))):
-                    if i < len(obj): r.append(obj[i])
-                    if i < len(o): r.append(o[i])
-                return r
+                return [x for i in range(max(len(obj), len(args[0]))) for x in ([obj[i]] if i < len(obj) else []) + ([args[0][i]] if i < len(args[0]) else [])]
             return ('builtin', _il)
         if member == 'flatten':
-            def _flatten(args, ctx):
-                d = int(args[0]) if args else 1
+            def _fl(args, ctx):
                 def _f(a, d):
                     return [x for i in a for x in (_f(i, d-1) if isinstance(i, list) and d > 0 else [i])]
-                return _f(obj, d)
-            return ('builtin', _flatten)
+                return _f(obj, int(args[0]) if args else 1)
+            return ('builtin', _fl)
         if member == 'takeWhile':
             def _tw(args, ctx):
                 r = []
@@ -346,11 +342,7 @@ class MemberMixin:
                 return r
             return ('builtin', _scan)
         if member == 'product':
-            def _prod(args, ctx):
-                r = 1
-                for x in obj: r *= x
-                return r
-            return ('builtin', _prod)
+            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda a, b: a * b, obj, 1))
         if member == 'mapIndexed':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)])
         if member == 'average':
@@ -411,19 +403,12 @@ class MemberMixin:
                 m = max(c.values())
                 return [k for k, v in c.items() if v == m]
             return ('builtin', _mode)
-        if member == 'stddev':
-            def _stddev(args, ctx):
-                mean = sum(obj) / len(obj)
-                v = sum((x - mean) ** 2 for x in obj) / len(obj)
-                result = v ** 0.5
-                return int(result) if result == int(result) else result
-            return ('builtin', _stddev)
-        if member == 'variance':
-            def _variance(args, ctx):
-                mean = sum(obj) / len(obj)
-                result = sum((x - mean) ** 2 for x in obj) / len(obj)
-                return int(result) if result == int(result) else result
-            return ('builtin', _variance)
+        if member in ('stddev', 'variance'):
+            def _sv(args, ctx):
+                v = sum((x - sum(obj) / len(obj)) ** 2 for x in obj) / len(obj)
+                r = v ** 0.5 if member == 'stddev' else v
+                return int(r) if r == int(r) else r
+            return ('builtin', _sv)
         if member == 'chunkBy':
             def _cb(args, ctx):
                 if not obj: return []
@@ -462,6 +447,12 @@ class MemberMixin:
             return ('builtin', _gc)
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'foldRight':
+            def _fr(args, ctx):
+                acc = args[1]
+                for x in reversed(obj): acc = self._call_function(args[0], [acc, x])
+                return acc
+            return ('builtin', _fr)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -636,12 +627,12 @@ class MemberMixin:
                 try: json.loads(obj); return True
                 except (ValueError, TypeError): return False
             return ('builtin', _ij)
-        if member == 'encodeBase64':
+        if member in ('encodeBase64', 'decodeBase64'):
             import base64 as _b64
-            return ('builtin', lambda args, ctx: _b64.b64encode(obj.encode()).decode())
-        if member == 'decodeBase64':
-            import base64 as _b64
-            return ('builtin', lambda args, ctx: _b64.b64decode(obj.encode()).decode())
+            return ('builtin', lambda args, ctx: (_b64.b64encode if member == 'encodeBase64' else _b64.b64decode)(obj.encode()).decode())
+        if member == 'matchCount':
+            import re as _re
+            return ('builtin', lambda args, ctx: len(_re.findall(args[0], obj)))
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -784,6 +775,12 @@ class MemberMixin:
                 if n > 1: f.append(n)
                 return f
             return ('builtin', _pf)
+        if member == 'asTime':
+            def _at(args, ctx):
+                n = int(obj)
+                h, m, s = n // 3600, (n % 3600) // 60, n % 60
+                return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+            return ('builtin', _at)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
