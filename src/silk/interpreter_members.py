@@ -215,6 +215,13 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [[k, v] for k, v in sorted(obj.items(), key=lambda x: x[1])])
         if member == 'toQueryString':
             return ('builtin', lambda args, ctx: '&'.join(f"{k}={v}" for k, v in obj.items()))
+        if member == 'groupByValue':
+            def _gbv(args, ctx):
+                groups = {}
+                for k, v in obj.items():
+                    groups.setdefault(v, []).append(k)
+                return groups
+            return ('builtin', _gbv)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -489,6 +496,15 @@ class MemberMixin:
                 from itertools import permutations as _p
                 return [list(p) for p in _p(obj)]
             return ('builtin', _permutations)
+        if member == 'median':
+            def _median(args, ctx):
+                s = sorted(obj)
+                n = len(s)
+                if n % 2 == 1:
+                    return s[n // 2]
+                mid = s[n // 2 - 1] + s[n // 2]
+                return mid / 2 if mid % 2 else mid // 2
+            return ('builtin', _median)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -666,6 +682,18 @@ class MemberMixin:
             return ('builtin', _soundex)
         if member == 'isUrl':
             return ('builtin', lambda args, ctx: obj.startswith(('http://', 'https://')) and '.' in obj.split('//')[1])
+        if member == 'caesar':
+            def _caesar(args, ctx):
+                shift = int(args[0])
+                result = []
+                for ch in obj:
+                    if ch.isalpha():
+                        base = ord('A') if ch.isupper() else ord('a')
+                        result.append(chr((ord(ch) - base + shift) % 26 + base))
+                    else:
+                        result.append(ch)
+                return ''.join(result)
+            return ('builtin', _caesar)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -695,6 +723,7 @@ class MemberMixin:
             'clampMin': lambda a: max(obj, a[0]), 'clampMax': lambda a: min(obj, a[0]),
             'toFixed': lambda a: f"{obj:.{int(a[0])}f}", 'pow': lambda a: obj ** int(a[0]),
             'gcd': lambda a: math.gcd(int(obj), int(a[0])),
+            'lcm': lambda a: abs(int(obj) * int(a[0])) // math.gcd(int(obj), int(a[0])),
             'clamp': lambda a: max(a[0], min(obj, a[1])),
             'isBetween': lambda a: a[0] <= obj <= a[1],
         }
