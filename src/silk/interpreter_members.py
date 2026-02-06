@@ -157,11 +157,7 @@ class MemberMixin:
                 return [x for k, v in obj.items() for x in self._call_function(args[0], [k, v])]
             return ('builtin', _fm)
         if member == 'groupByValue':
-            def _gbv(args, ctx):
-                g = {}
-                for k, v in obj.items(): g.setdefault(v, []).append(k)
-                return g
-            return ('builtin', _gbv)
+            return ('builtin', lambda args, ctx: (lambda g: [g.setdefault(v, []).append(k) for k, v in obj.items()] and g or g)({}))
         if member == 'deepMerge':
             def _dm(args, ctx):
                 def _m(a, b):
@@ -189,6 +185,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [v for k, v in obj.items() if self._call_function(args[0], [k, v])])
         if member == 'toSortedKeys':
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
+        if member == 'countValues':
+            return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -226,6 +224,7 @@ class MemberMixin:
             'dotProduct': lambda a: sum(x * y for x, y in zip(obj, a[0])),
             'zipWith': lambda a: [self._call_function(a[1], [x, y]) for x, y in zip(obj, a[0])],
             'windows': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)],
+            'splitAt': lambda a: [obj[:int(a[0])], obj[int(a[0]):]],
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -486,6 +485,7 @@ class MemberMixin:
             'normalize': lambda: ' '.join(obj.split()),
             'isIPv4': lambda: len(p := obj.split('.')) == 4 and all(s.isdigit() and 0 <= int(s) <= 255 for s in p),
             'isPangram': lambda: set('abcdefghijklmnopqrstuvwxyz').issubset(obj.lower()),
+            'collapseWhitespace': lambda: ' '.join(obj.split()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -665,6 +665,7 @@ class MemberMixin:
             'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
             'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
             'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9,
+            'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
         }
         if member in _simple:
             fn = _simple[member]
