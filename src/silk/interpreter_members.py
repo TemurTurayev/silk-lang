@@ -191,6 +191,8 @@ class MemberMixin:
                 for k, v in obj.items(): r.setdefault(v, []).append(k)
                 return r
             return ('builtin', _ig)
+        if member == 'diffKeys':
+            return ('builtin', lambda args, ctx: [k for k in obj if k not in args[0]])
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -386,55 +388,42 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
         if member == 'associate':
             def _assoc(args, ctx):
-                result = {}
-                for item in obj:
-                    pair = self._call_function(args[0], [item])
-                    result[pair[0]] = pair[1]
-                return result
+                r = {}
+                for x in obj: p = self._call_function(args[0], [x]); r[p[0]] = p[1]
+                return r
             return ('builtin', _assoc)
         if member == 'interpose':
-            def _interpose(args, ctx):
-                if len(obj) <= 1:
-                    return list(obj)
-                result = [obj[0]]
-                for item in obj[1:]:
-                    result.append(args[0]); result.append(item)
-                return result
-            return ('builtin', _interpose)
+            def _ip(args, ctx):
+                if len(obj) <= 1: return list(obj)
+                r = [obj[0]]
+                for x in obj[1:]: r.append(args[0]); r.append(x)
+                return r
+            return ('builtin', _ip)
         if member == 'transpose':
             return ('builtin', lambda args, ctx: [list(row) for row in zip(*obj)])
         if member == 'combinations':
-            def _combinations(args, ctx):
-                from itertools import combinations as _c
-                return [list(c) for c in _c(obj, int(args[0]))]
-            return ('builtin', _combinations)
+            return ('builtin', lambda args, ctx: [list(c) for c in __import__('itertools').combinations(obj, int(args[0]))])
         if member == 'permutations':
-            def _permutations(args, ctx):
-                from itertools import permutations as _p
-                return [list(p) for p in _p(obj)]
-            return ('builtin', _permutations)
+            return ('builtin', lambda args, ctx: [list(p) for p in __import__('itertools').permutations(obj)])
         if member == 'median':
-            def _median(args, ctx):
-                s = sorted(obj)
-                n = len(s)
-                if n % 2 == 1:
-                    return s[n // 2]
+            def _med(args, ctx):
+                s, n = sorted(obj), len(obj)
+                if n % 2 == 1: return s[n // 2]
                 mid = s[n // 2 - 1] + s[n // 2]
                 return mid / 2 if mid % 2 else mid // 2
-            return ('builtin', _median)
+            return ('builtin', _med)
         if member == 'mode':
             def _mode(args, ctx):
-                counts = {}
-                for item in obj:
-                    counts[item] = counts.get(item, 0) + 1
-                max_count = max(counts.values())
-                return [k for k, v in counts.items() if v == max_count]
+                c = {}
+                for x in obj: c[x] = c.get(x, 0) + 1
+                m = max(c.values())
+                return [k for k, v in c.items() if v == m]
             return ('builtin', _mode)
         if member == 'stddev':
             def _stddev(args, ctx):
                 mean = sum(obj) / len(obj)
-                variance = sum((x - mean) ** 2 for x in obj) / len(obj)
-                result = variance ** 0.5
+                v = sum((x - mean) ** 2 for x in obj) / len(obj)
+                result = v ** 0.5
                 return int(result) if result == int(result) else result
             return ('builtin', _stddev)
         if member == 'variance':
@@ -470,6 +459,15 @@ class MemberMixin:
                     r.append(v)
                 return r
             return ('builtin', _mw)
+        if member == 'groupConsecutive':
+            def _gc(args, ctx):
+                if not obj: return []
+                r, g = [], [obj[0]]
+                for x in obj[1:]:
+                    if x == g[-1]: g.append(x)
+                    else: r.append(g); g = [x]
+                return r + [g]
+            return ('builtin', _gc)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -647,6 +645,12 @@ class MemberMixin:
                 try: json.loads(obj); return True
                 except (ValueError, TypeError): return False
             return ('builtin', _ij)
+        if member == 'encodeBase64':
+            import base64 as _b64
+            return ('builtin', lambda args, ctx: _b64.b64encode(obj.encode()).decode())
+        if member == 'decodeBase64':
+            import base64 as _b64
+            return ('builtin', lambda args, ctx: _b64.b64decode(obj.encode()).decode())
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -774,6 +778,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: str(_F(obj).limit_denominator()))
         if member == 'toCurrency':
             return ('builtin', lambda args, ctx: f"${obj:,.2f}")
+        if member == 'isAmicable':
+            def _ia(args, ctx):
+                def _ds(n): return sum(i for i in range(1, n) if n % i == 0)
+                a, b = int(obj), int(args[0])
+                return a != b and _ds(a) == b and _ds(b) == a
+            return ('builtin', _ia)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
