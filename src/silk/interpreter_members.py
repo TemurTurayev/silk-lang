@@ -105,6 +105,20 @@ class MemberMixin:
                     self._call_function(args[0], [k, v])
                 return None
             return ('builtin', _map_foreach)
+        if member == 'get':
+            return ('builtin', lambda args, ctx: obj.get(
+                args[0], args[1] if len(args) > 1 else None
+            ))
+        if member == 'filter':
+            def _map_filter(args, ctx):
+                return {k: v for k, v in obj.items()
+                        if self._call_function(args[0], [k, v])}
+            return ('builtin', _map_filter)
+        if member == 'map':
+            def _map_map(args, ctx):
+                return {k: self._call_function(args[0], [k, v])
+                        for k, v in obj.items()}
+            return ('builtin', _map_map)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -246,6 +260,13 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [
                 [a, b] for a, b in zip(obj, args[0])
             ])
+        if member == 'compact':
+            return ('builtin', lambda args, ctx: [x for x in obj if x is not None])
+        if member == 'chunked':
+            def _arr_chunked(args, ctx):
+                n = int(args[0])
+                return [obj[i:i + n] for i in range(0, len(obj), n)]
+            return ('builtin', _arr_chunked)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
