@@ -688,6 +688,22 @@ class MemberMixin:
             return ('builtin', _is_email)
         if member == 'partition':
             return ('builtin', lambda args, ctx: list(obj.partition(args[0])))
+        if member == 'commonPrefix':
+            def _common_prefix(args, ctx):
+                other = args[0]
+                i = 0
+                while i < len(obj) and i < len(other) and obj[i] == other[i]:
+                    i += 1
+                return obj[:i]
+            return ('builtin', _common_prefix)
+        if member == 'commonSuffix':
+            def _common_suffix(args, ctx):
+                other = args[0]
+                i = 0
+                while i < len(obj) and i < len(other) and obj[-(i+1)] == other[-(i+1)]:
+                    i += 1
+                return obj[len(obj)-i:] if i else ''
+            return ('builtin', _common_suffix)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -767,6 +783,16 @@ class MemberMixin:
                         n -= val
                 return result
             return ('builtin', _roman)
+        if member == 'fibonacci':
+            def _fibonacci(args, ctx):
+                n = int(obj)
+                if n <= 0:
+                    return 0
+                a, b = 0, 1
+                for _ in range(n):
+                    a, b = b, a + b
+                return a
+            return ('builtin', _fibonacci)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
