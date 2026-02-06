@@ -209,6 +209,8 @@ class MemberMixin:
                     result.extend(self._call_function(args[0], [k, v]))
                 return result
             return ('builtin', _flatmap)
+        if member == 'toSortedArray':
+            return ('builtin', lambda args, ctx: [[k, obj[k]] for k in sorted(obj.keys())])
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -471,6 +473,8 @@ class MemberMixin:
                     result.append(args[0]); result.append(item)
                 return result
             return ('builtin', _interpose)
+        if member == 'transpose':
+            return ('builtin', lambda args, ctx: [list(row) for row in zip(*obj)])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -635,6 +639,11 @@ class MemberMixin:
                     prev = curr
                 return prev[n]
             return ('builtin', _levenshtein)
+        if member == 'hamming':
+            def _hamming(args, ctx):
+                other = args[0]
+                return sum(a != b for a, b in zip(obj, other))
+            return ('builtin', _hamming)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -753,6 +762,14 @@ class MemberMixin:
                 result = ' '.join(reversed(parts))
                 return ('negative ' + result) if n < 0 else result
             return ('builtin', _to_words)
+        if member == 'collatz':
+            def _collatz(args, ctx):
+                n, steps = int(obj), 0
+                while n != 1:
+                    n = n // 2 if n % 2 == 0 else 3 * n + 1
+                    steps += 1
+                return steps
+            return ('builtin', _collatz)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
