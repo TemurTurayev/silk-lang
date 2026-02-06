@@ -161,9 +161,10 @@ class IfStatement:
 
 @dataclass
 class WhileLoop:
-    """While loop."""
+    """While loop. else_body runs if loop completes without break."""
     condition: Any
     body: list
+    else_body: list | None = None
 
 
 @dataclass
@@ -173,6 +174,7 @@ class ForLoop:
     iterable: Any
     body: list
     index_name: str | None = None
+    else_body: list | None = None
 
 
 @dataclass
@@ -426,6 +428,13 @@ class DestructureLetArray:
     """Destructuring let: let [a, b, ...rest] = expr."""
     names: list  # list of str
     rest_name: str | None  # name for ...rest, or None
+    value: Any
+
+
+@dataclass
+class DestructureLetDict:
+    """Destructuring let: let {a, b} = expr."""
+    names: list  # list of str (keys to extract)
     value: Any
 
 

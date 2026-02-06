@@ -24,8 +24,8 @@ from .ast import (
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
     MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
-    RangeExpr, TypeofExpr, DestructureLetArray, LambdaExpr,
-    OptionalChain
+    RangeExpr, TypeofExpr, DestructureLetArray, DestructureLetDict,
+    LambdaExpr, OptionalChain
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -35,6 +35,11 @@ from .types import (
     truthy, multiply, divide
 )
 from .interpreter_members import MemberMixin
+
+_COMPOUND_OPS = {
+    '+': lambda a, b: a + b, '-': lambda a, b: a - b,
+    '*': lambda a, b: a * b, '/': lambda a, b: a / b,
+}
 
 
 class Interpreter(MemberMixin):
@@ -91,6 +96,17 @@ class Interpreter(MemberMixin):
                 rest = value[len(node.names):]
                 env.define(node.rest_name, rest)
 
+        elif isinstance(node, DestructureLetDict):
+            value = self.evaluate(node.value, env)
+            if isinstance(value, SilkStruct):
+                for name in node.names:
+                    env.define(name, value.fields.get(name))
+            elif isinstance(value, dict):
+                for name in node.names:
+                    env.define(name, value.get(name))
+            else:
+                raise RuntimeError_("Dict destructuring requires a map or struct")
+
         elif isinstance(node, Assignment):
             value = self.evaluate(node.value, env)
             env.set(node.name, value)
@@ -98,13 +114,7 @@ class Interpreter(MemberMixin):
         elif isinstance(node, CompoundAssignment):
             current = env.get(node.name)
             right = self.evaluate(node.value, env)
-            ops = {
-                '+': lambda a, b: a + b,
-                '-': lambda a, b: a - b,
-                '*': lambda a, b: a * b,
-                '/': lambda a, b: a / b,
-            }
-            env.set(node.name, ops[node.op](current, right))
+            env.set(node.name, _COMPOUND_OPS[node.op](current, right))
 
         elif isinstance(node, IndexAssign):
             obj = self.evaluate(node.obj, env)
@@ -136,14 +146,12 @@ class Interpreter(MemberMixin):
         elif isinstance(node, MemberCompoundAssign):
             obj = self.evaluate(node.obj, env)
             right = self.evaluate(node.value, env)
-            ops = {'+': lambda a, b: a + b, '-': lambda a, b: a - b,
-                   '*': lambda a, b: a * b, '/': lambda a, b: a / b}
             if isinstance(obj, SilkStruct):
                 current = obj.fields[node.member]
-                obj.fields[node.member] = ops[node.op](current, right)
+                obj.fields[node.member] = _COMPOUND_OPS[node.op](current, right)
             elif isinstance(obj, dict):
                 current = obj[node.member]
-                obj[node.member] = ops[node.op](current, right)
+                obj[node.member] = _COMPOUND_OPS[node.op](current, right)
             else:
                 raise RuntimeError_(
                     f"Cannot compound-assign member '{node.member}' on {type(obj).__name__}"
@@ -153,13 +161,11 @@ class Interpreter(MemberMixin):
             obj = self.evaluate(node.obj, env)
             idx = self.evaluate(node.index, env)
             right = self.evaluate(node.value, env)
-            ops = {'+': lambda a, b: a + b, '-': lambda a, b: a - b,
-                   '*': lambda a, b: a * b, '/': lambda a, b: a / b}
             if isinstance(obj, list):
                 i = int(idx)
-                obj[i] = ops[node.op](obj[i], right)
+                obj[i] = _COMPOUND_OPS[node.op](obj[i], right)
             elif isinstance(obj, dict):
-                obj[idx] = ops[node.op](obj[idx], right)
+                obj[idx] = _COMPOUND_OPS[node.op](obj[idx], right)
             else:
                 raise RuntimeError_("Compound index assignment only works on arrays and maps")
 
@@ -178,18 +184,23 @@ class Interpreter(MemberMixin):
                     self.execute_block(node.else_body, Environment(parent=env))
 
         elif isinstance(node, WhileLoop):
+            broke = False
             while truthy(self.evaluate(node.condition, env)):
                 try:
                     self.execute_block(node.body, Environment(parent=env))
                 except BreakSignal:
+                    broke = True
                     break
                 except ContinueSignal:
                     continue
+            if not broke and node.else_body:
+                self.execute_block(node.else_body, Environment(parent=env))
 
         elif isinstance(node, ForLoop):
             iterable = self.evaluate(node.iterable, env)
             if not isinstance(iterable, list):
                 raise RuntimeError_("for..in requires an iterable (array or range)")
+            broke = False
             for i, item in enumerate(iterable):
                 loop_env = Environment(parent=env)
                 loop_env.define(node.var_name, item)
@@ -198,9 +209,12 @@ class Interpreter(MemberMixin):
                 try:
                     self.execute_block(node.body, loop_env)
                 except BreakSignal:
+                    broke = True
                     break
                 except ContinueSignal:
                     continue
+            if not broke and node.else_body:
+                self.execute_block(node.else_body, Environment(parent=env))
 
         elif isinstance(node, FunctionDef):
             func = ('function', node.params, node.body, env)

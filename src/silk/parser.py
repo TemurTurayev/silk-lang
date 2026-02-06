@@ -16,8 +16,8 @@ from .ast import (
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
     MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
-    RangeExpr, TypeofExpr, DestructureLetArray, LambdaExpr,
-    OptionalChain
+    RangeExpr, TypeofExpr, DestructureLetArray, DestructureLetDict,
+    LambdaExpr, OptionalChain
 )
 from .parser_types import TypeParserMixin
 
@@ -175,6 +175,8 @@ class Parser(TypeParserMixin):
             mutable = True
         if self.match(TokenType.LBRACKET):
             return self._parse_destructure_array()
+        if self.match(TokenType.LBRACE):
+            return self._parse_destructure_dict()
         name = self.eat(TokenType.IDENTIFIER).value
         type_hint = None
         if self.match(TokenType.COLON):
@@ -201,6 +203,20 @@ class Parser(TypeParserMixin):
         self.eat(TokenType.ASSIGN)
         value = self.parse_expression()
         return DestructureLetArray(names, rest_name, value)
+
+    def _parse_destructure_dict(self) -> DestructureLetDict:
+        self.eat(TokenType.LBRACE)
+        self.skip_newlines()
+        names = []
+        while not self.match(TokenType.RBRACE):
+            names.append(self.eat(TokenType.IDENTIFIER).value)
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+            self.skip_newlines()
+        self.eat(TokenType.RBRACE)
+        self.eat(TokenType.ASSIGN)
+        value = self.parse_expression()
+        return DestructureLetDict(names, value)
 
     def _parse_params(self) -> list:
         """Parse function parameter list. Returns (name, type_hint, default_expr) tuples."""
@@ -264,7 +280,12 @@ class Parser(TypeParserMixin):
         self.eat(TokenType.WHILE)
         condition = self.parse_expression()
         body = self.parse_block()
-        return WhileLoop(condition, body)
+        else_body = None
+        self.skip_newlines()
+        if self.match(TokenType.ELSE):
+            self.eat(TokenType.ELSE)
+            else_body = self.parse_block()
+        return WhileLoop(condition, body, else_body)
 
     def parse_for(self) -> ForLoop:
         self.eat(TokenType.FOR)
@@ -277,7 +298,12 @@ class Parser(TypeParserMixin):
         self.eat(TokenType.IN)
         iterable = self.parse_expression()
         body = self.parse_block()
-        return ForLoop(first, iterable, body, index_name)
+        else_body = None
+        self.skip_newlines()
+        if self.match(TokenType.ELSE):
+            self.eat(TokenType.ELSE)
+            else_body = self.parse_block()
+        return ForLoop(first, iterable, body, index_name, else_body)
 
     def parse_return(self) -> ReturnStatement:
         self.eat(TokenType.RETURN)

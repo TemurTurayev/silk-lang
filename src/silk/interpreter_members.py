@@ -212,6 +212,20 @@ class MemberMixin:
             def _arr_count(args, ctx):
                 return sum(1 for item in obj if self._call_function(args[0], [item]))
             return ('builtin', _arr_count)
+        if member == 'sortBy':
+            def _arr_sort_by(args, ctx):
+                return sorted(obj, key=lambda item: self._call_function(args[0], [item]))
+            return ('builtin', _arr_sort_by)
+        if member == 'groupBy':
+            def _arr_group_by(args, ctx):
+                groups = {}
+                for item in obj:
+                    key = self._call_function(args[0], [item])
+                    if key not in groups:
+                        groups[key] = []
+                    groups[key].append(item)
+                return groups
+            return ('builtin', _arr_group_by)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -274,6 +288,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj.replace(args[0], args[1]))
         if member == 'includes':
             return ('builtin', lambda args, ctx: args[0] in obj)
+        if member == 'charAt':
+            return ('builtin', lambda args, ctx: obj[int(args[0])])
+        if member == 'charCodeAt':
+            return ('builtin', lambda args, ctx: ord(obj[int(args[0])]))
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
