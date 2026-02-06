@@ -188,6 +188,14 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {})
         if member == 'invert':
             return ('builtin', lambda args, ctx: {v: k for k, v in obj.items()})
+        if member == 'filterValues':
+            def _fv(args, ctx):
+                return {k: v for k, v in obj.items() if self._call_function(args[0], [v])}
+            return ('builtin', _fv)
+        if member == 'filterKeys':
+            def _fk(args, ctx):
+                return {k: v for k, v in obj.items() if self._call_function(args[0], [k])}
+            return ('builtin', _fk)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -523,6 +531,11 @@ class MemberMixin:
                 size = int(args[0])
                 return [obj[i:i + size] for i in range(0, len(obj), size)]
             return ('builtin', _chunk)
+        if member == 'windowed':
+            def _windowed(args, ctx):
+                size = int(args[0])
+                return [obj[i:i + size] for i in range(len(obj) - size + 1)]
+            return ('builtin', _windowed)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -688,6 +701,19 @@ class MemberMixin:
                 s = re.sub(r'([a-z])([A-Z])', r'\1_\2', s)
                 return s.lower()
             return ('builtin', _snake)
+        if member == 'kebabCase':
+            def _kebab(args, ctx):
+                import re
+                s = re.sub(r'[_\s]+', '-', obj)
+                s = re.sub(r'([a-z])([A-Z])', r'\1-\2', s)
+                return s.lower()
+            return ('builtin', _kebab)
+        if member == 'titleCase':
+            def _title(args, ctx):
+                import re
+                parts = re.split(r'[-_\s]+', obj)
+                return ' '.join(w.capitalize() for w in parts)
+            return ('builtin', _title)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
