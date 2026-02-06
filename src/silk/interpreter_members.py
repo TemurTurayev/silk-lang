@@ -557,6 +557,16 @@ class MemberMixin:
             return ('builtin', _windowed)
         if member == 'zipWithIndex':
             return ('builtin', lambda args, ctx: [[v, i] for i, v in enumerate(obj)])
+        if member == 'interpose':
+            def _interpose(args, ctx):
+                if len(obj) <= 1:
+                    return list(obj)
+                result = [obj[0]]
+                for item in obj[1:]:
+                    result.append(args[0])
+                    result.append(item)
+                return result
+            return ('builtin', _interpose)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -704,6 +714,23 @@ class MemberMixin:
                     i += 1
                 return obj[len(obj)-i:] if i else ''
             return ('builtin', _common_suffix)
+        if member == 'levenshtein':
+            def _levenshtein(args, ctx):
+                other = args[0]
+                m, n = len(obj), len(other)
+                if m == 0:
+                    return n
+                if n == 0:
+                    return m
+                prev = list(range(n + 1))
+                for i in range(1, m + 1):
+                    curr = [i] + [0] * n
+                    for j in range(1, n + 1):
+                        cost = 0 if obj[i-1] == other[j-1] else 1
+                        curr[j] = min(curr[j-1] + 1, prev[j] + 1, prev[j-1] + cost)
+                    prev = curr
+                return prev[n]
+            return ('builtin', _levenshtein)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -793,6 +820,35 @@ class MemberMixin:
                     a, b = b, a + b
                 return a
             return ('builtin', _fibonacci)
+        if member == 'digitSum':
+            return ('builtin', lambda args, ctx: sum(int(d) for d in str(abs(int(obj)))))
+        if member == 'toWords':
+            def _to_words(args, ctx):
+                n = int(obj)
+                if n == 0:
+                    return 'zero'
+                ones = ['','one','two','three','four','five','six','seven','eight','nine',
+                        'ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen',
+                        'seventeen','eighteen','nineteen']
+                tens = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']
+                def _chunk(num):
+                    if num == 0:
+                        return ''
+                    if num < 20:
+                        return ones[num]
+                    if num < 100:
+                        return tens[num // 10] + ('-' + ones[num % 10] if num % 10 else '')
+                    return ones[num // 100] + ' hundred' + (' ' + _chunk(num % 100) if num % 100 else '')
+                parts, scales = [], ['', ' thousand', ' million', ' billion']
+                i, rem = 0, abs(n)
+                while rem > 0:
+                    if rem % 1000:
+                        parts.append(_chunk(rem % 1000) + scales[i])
+                    rem //= 1000
+                    i += 1
+                result = ' '.join(reversed(parts))
+                return ('negative ' + result) if n < 0 else result
+            return ('builtin', _to_words)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
