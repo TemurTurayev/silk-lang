@@ -184,6 +184,10 @@ class MemberMixin:
                     return str(v)
                 return json.dumps(_convert(obj))
             return ('builtin', _to_json)
+        if member == 'update':
+            return ('builtin', lambda args, ctx: {**obj, **args[0]})
+        if member == 'size':
+            return ('builtin', lambda args, ctx: len(obj))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -476,6 +480,8 @@ class MemberMixin:
                 random.shuffle(copy)
                 return copy
             return ('builtin', _arr_shuffle)
+        if member == 'difference':
+            return ('builtin', lambda args, ctx: [x for x in obj if x not in args[0]])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -603,6 +609,11 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: args[0] + obj + args[1])
         if member == 'lastIndexOf':
             return ('builtin', lambda args, ctx: obj.rfind(args[0]))
+        if member == 'squeeze':
+            def _squeeze(args, ctx):
+                import re
+                return re.sub(r' {2,}', ' ', obj)
+            return ('builtin', _squeeze)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -650,6 +661,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: isinstance(obj, int))
         if member == 'isFloat':
             return ('builtin', lambda args, ctx: isinstance(obj, float))
+        if member == 'lerp':
+            def _lerp(args, ctx):
+                target, t = args[0], args[1]
+                result = obj + (target - obj) * t
+                return int(result) if result == int(result) else result
+            return ('builtin', _lerp)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
