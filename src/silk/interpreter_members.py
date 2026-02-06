@@ -204,6 +204,10 @@ class MemberMixin:
                     result[pair[0]] = pair[1]
                 return result
             return ('builtin', _me)
+        if member == 'count':
+            def _count(args, ctx):
+                return sum(1 for k, v in obj.items() if self._call_function(args[0], [k, v]))
+            return ('builtin', _count)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -544,49 +548,67 @@ class MemberMixin:
                 size = int(args[0])
                 return [obj[i:i + size] for i in range(len(obj) - size + 1)]
             return ('builtin', _windowed)
+        if member == 'zipWithIndex':
+            return ('builtin', lambda args, ctx: [[v, i] for i, v in enumerate(obj)])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
         """Evaluate member access on a string."""
         if member == 'length':
             return len(obj)
-        if member in ('upper', 'toUpper'):
-            return ('builtin', lambda args, ctx: obj.upper())
-        if member in ('lower', 'toLower'):
-            return ('builtin', lambda args, ctx: obj.lower())
-        if member in ('strip', 'trim'):
-            return ('builtin', lambda args, ctx: obj.strip())
-        if member == 'trim_start':
-            return ('builtin', lambda args, ctx: obj.lstrip())
-        if member == 'trim_end':
-            return ('builtin', lambda args, ctx: obj.rstrip())
-        if member == 'replace':
-            return ('builtin', lambda args, ctx: obj.replace(args[0], args[1]))
-        if member == 'starts_with':
-            return ('builtin', lambda args, ctx: obj.startswith(args[0]))
-        if member == 'ends_with':
-            return ('builtin', lambda args, ctx: obj.endswith(args[0]))
-        if member == 'contains':
-            return ('builtin', lambda args, ctx: args[0] in obj)
-        if member == 'split':
-            return ('builtin', lambda args, ctx: obj.split(args[0] if args else " "))
-        if member == 'chars':
-            return ('builtin', lambda args, ctx: list(obj))
-        if member == 'indexOf':
-            return ('builtin', lambda args, ctx: obj.find(args[0]))
+        # No-arg methods (return lambdas that ignore args)
+        _noarg = {
+            'upper': lambda: obj.upper(), 'toUpper': lambda: obj.upper(),
+            'lower': lambda: obj.lower(), 'toLower': lambda: obj.lower(),
+            'strip': lambda: obj.strip(), 'trim': lambda: obj.strip(),
+            'trim_start': lambda: obj.lstrip(), 'trim_end': lambda: obj.rstrip(),
+            'chars': lambda: list(obj), 'reverse': lambda: obj[::-1],
+            'isEmpty': lambda: len(obj) == 0, 'words': lambda: obj.split(),
+            'lines': lambda: obj.split('\n'), 'title': lambda: obj.title(),
+            'capitalize': lambda: obj.capitalize(), 'swapCase': lambda: obj.swapcase(),
+            'isDigit': lambda: len(obj) > 0 and obj.isdigit(),
+            'isAlpha': lambda: len(obj) > 0 and obj.isalpha(),
+            'isUpper': lambda: len(obj) > 0 and obj.isupper(),
+            'isLower': lambda: len(obj) > 0 and obj.islower(),
+            'isBlank': lambda: len(obj.strip()) == 0,
+            'isAlphanumeric': lambda: len(obj) > 0 and obj.isalnum(),
+        }
+        if member in _noarg:
+            fn = _noarg[member]
+            return ('builtin', lambda args, ctx: fn())
+        # Single-arg methods
+        _onearg = {
+            'contains': lambda a: a[0] in obj, 'includes': lambda a: a[0] in obj,
+            'starts_with': lambda a: obj.startswith(a[0]),
+            'ends_with': lambda a: obj.endswith(a[0]),
+            'indexOf': lambda a: obj.find(a[0]),
+            'lastIndexOf': lambda a: obj.rfind(a[0]),
+            'count': lambda a: obj.count(a[0]),
+            'split': lambda a: obj.split(a[0] if a else " "),
+            'repeat': lambda a: obj * int(a[0]),
+            'charAt': lambda a: obj[int(a[0])],
+            'charCodeAt': lambda a: ord(obj[int(a[0])]),
+            'zfill': lambda a: obj.zfill(int(a[0])),
+        }
+        if member in _onearg:
+            fn = _onearg[member]
+            return ('builtin', lambda args, ctx: fn(args))
+        # Two-arg methods
+        _twoarg = {
+            'replace': lambda a: obj.replace(a[0], a[1]),
+            'replaceAll': lambda a: obj.replace(a[0], a[1]),
+            'replaceFirst': lambda a: obj.replace(a[0], a[1], 1),
+            'padStart': lambda a: obj.rjust(int(a[0]), a[1]),
+            'padEnd': lambda a: obj.ljust(int(a[0]), a[1]),
+            'center': lambda a: obj.center(int(a[0]), a[1]),
+            'wrap': lambda a: a[0] + obj + a[1],
+            'mask': lambda a: a[0] * (len(obj) - int(a[1])) + obj[-int(a[1]):] if len(obj) > int(a[1]) else obj,
+        }
+        if member in _twoarg:
+            fn = _twoarg[member]
+            return ('builtin', lambda args, ctx: fn(args))
         if member in ('substring', 'slice'):
-            def _substring(args, ctx):
-                start = int(args[0])
-                if len(args) > 1:
-                    return obj[start:int(args[1])]
-                return obj[start:]
-            return ('builtin', _substring)
-        if member == 'repeat':
-            return ('builtin', lambda args, ctx: obj * int(args[0]))
-        if member == 'padStart':
-            return ('builtin', lambda args, ctx: obj.rjust(int(args[0]), args[1]))
-        if member == 'padEnd':
-            return ('builtin', lambda args, ctx: obj.ljust(int(args[0]), args[1]))
+            return ('builtin', lambda args, ctx: obj[int(args[0]):int(args[1])] if len(args) > 1 else obj[int(args[0]):])
         if member == 'toInt':
             def _to_int(args, ctx):
                 try:
@@ -602,34 +624,6 @@ class MemberMixin:
                 except ValueError:
                     raise RuntimeError_(f"Cannot convert '{obj}' to float")
             return ('builtin', _to_float)
-        if member == 'reverse':
-            return ('builtin', lambda args, ctx: obj[::-1])
-        if member == 'isEmpty':
-            return ('builtin', lambda args, ctx: len(obj) == 0)
-        if member == 'replaceAll':
-            return ('builtin', lambda args, ctx: obj.replace(args[0], args[1]))
-        if member == 'includes':
-            return ('builtin', lambda args, ctx: args[0] in obj)
-        if member == 'charAt':
-            return ('builtin', lambda args, ctx: obj[int(args[0])])
-        if member == 'charCodeAt':
-            return ('builtin', lambda args, ctx: ord(obj[int(args[0])]))
-        if member == 'count':
-            return ('builtin', lambda args, ctx: obj.count(args[0]))
-        if member == 'isDigit':
-            return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isdigit())
-        if member == 'isAlpha':
-            return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isalpha())
-        if member == 'title':
-            return ('builtin', lambda args, ctx: obj.title())
-        if member == 'capitalize':
-            return ('builtin', lambda args, ctx: obj.capitalize())
-        if member == 'words':
-            return ('builtin', lambda args, ctx: obj.split())
-        if member == 'center':
-            return ('builtin', lambda args, ctx: obj.center(int(args[0]), args[1]))
-        if member == 'lines':
-            return ('builtin', lambda args, ctx: obj.split('\n'))
         if member == 'format':
             def _format(args, ctx):
                 result = obj
@@ -638,25 +632,14 @@ class MemberMixin:
                 return result
             return ('builtin', _format)
         if member == 'removePrefix':
-            def _remove_prefix(args, ctx):
-                return obj[len(args[0]):] if obj.startswith(args[0]) else obj
-            return ('builtin', _remove_prefix)
+            return ('builtin', lambda args, ctx: obj[len(args[0]):] if obj.startswith(args[0]) else obj)
         if member == 'removeSuffix':
-            def _remove_suffix(args, ctx):
-                return obj[:-len(args[0])] if obj.endswith(args[0]) else obj
-            return ('builtin', _remove_suffix)
+            return ('builtin', lambda args, ctx: obj[:-len(args[0])] if obj.endswith(args[0]) else obj)
         if member == 'truncate':
             def _truncate(args, ctx):
-                max_len = int(args[0])
-                suffix = args[1] if len(args) > 1 else ""
-                if len(obj) <= max_len:
-                    return obj
-                return obj[:max_len - len(suffix)] + suffix
+                max_len, suffix = int(args[0]), args[1] if len(args) > 1 else ""
+                return obj if len(obj) <= max_len else obj[:max_len - len(suffix)] + suffix
             return ('builtin', _truncate)
-        if member == 'isUpper':
-            return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isupper())
-        if member == 'isLower':
-            return ('builtin', lambda args, ctx: len(obj) > 0 and obj.islower())
         if member == 'isNumeric':
             def _is_numeric(args, ctx):
                 if not obj:
@@ -667,68 +650,28 @@ class MemberMixin:
                 except ValueError:
                     return False
             return ('builtin', _is_numeric)
-        if member == 'wrap':
-            return ('builtin', lambda args, ctx: args[0] + obj + args[1])
-        if member == 'lastIndexOf':
-            return ('builtin', lambda args, ctx: obj.rfind(args[0]))
         if member == 'squeeze':
-            def _squeeze(args, ctx):
-                import re
-                return re.sub(r' {2,}', ' ', obj)
-            return ('builtin', _squeeze)
-        if member == 'mask':
-            def _mask(args, ctx):
-                char, keep = args[0], int(args[1])
-                if len(obj) <= keep:
-                    return obj
-                return char * (len(obj) - keep) + obj[-keep:]
-            return ('builtin', _mask)
+            import re as _re
+            return ('builtin', lambda args, ctx: _re.sub(r' {2,}', ' ', obj))
         if member == 'at':
-            def _str_at(args, ctx):
-                idx = int(args[0])
-                return obj[idx] if -len(obj) <= idx < len(obj) else None
-            return ('builtin', _str_at)
-        if member == 'replaceFirst':
-            return ('builtin', lambda args, ctx: obj.replace(args[0], args[1], 1))
-        if member == 'isBlank':
-            return ('builtin', lambda args, ctx: len(obj.strip()) == 0)
-        if member == 'swapCase':
-            return ('builtin', lambda args, ctx: obj.swapcase())
-        if member == 'zfill':
-            return ('builtin', lambda args, ctx: obj.zfill(int(args[0])))
-        if member == 'camelCase':
-            def _camel(args, ctx):
-                import re
-                parts = re.split(r'[-_\s]+', obj)
-                return parts[0].lower() + ''.join(w.capitalize() for w in parts[1:])
-            return ('builtin', _camel)
-        if member == 'snakeCase':
-            def _snake(args, ctx):
-                import re
-                s = re.sub(r'[-\s]+', '_', obj)
-                s = re.sub(r'([a-z])([A-Z])', r'\1_\2', s)
+            return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
+        if member in ('camelCase', 'snakeCase', 'kebabCase', 'titleCase'):
+            import re as _re
+            def _case_convert(args, ctx):
+                parts = _re.split(r'[-_\s]+', obj)
+                if member == 'camelCase':
+                    return parts[0].lower() + ''.join(w.capitalize() for w in parts[1:])
+                if member == 'titleCase':
+                    return ' '.join(w.capitalize() for w in parts)
+                s = _re.sub(r'[-_\s]+', '_' if member == 'snakeCase' else '-', obj)
+                s = _re.sub(r'([a-z])([A-Z])', r'\1_\2' if member == 'snakeCase' else r'\1-\2', s)
                 return s.lower()
-            return ('builtin', _snake)
-        if member == 'kebabCase':
-            def _kebab(args, ctx):
-                import re
-                s = re.sub(r'[_\s]+', '-', obj)
-                s = re.sub(r'([a-z])([A-Z])', r'\1-\2', s)
-                return s.lower()
-            return ('builtin', _kebab)
-        if member == 'titleCase':
-            def _title(args, ctx):
-                import re
-                parts = re.split(r'[-_\s]+', obj)
-                return ' '.join(w.capitalize() for w in parts)
-            return ('builtin', _title)
+            return ('builtin', _case_convert)
         if member == 'truncateWords':
             def _trunc_words(args, ctx):
                 words = obj.split()
                 n = int(args[0])
-                if len(words) <= n:
-                    return obj
-                return ' '.join(words[:n]) + '...'
+                return obj if len(words) <= n else ' '.join(words[:n]) + '...'
             return ('builtin', _trunc_words)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
@@ -746,6 +689,8 @@ class MemberMixin:
             'toRadians': lambda: obj * math.pi / 180,
             'toDegrees': lambda: obj * 180 / math.pi,
             'factorial': lambda: math.factorial(int(obj)),
+            'toBinary': lambda: bin(int(obj))[2:],
+            'toHex': lambda: hex(int(obj))[2:],
         }
         if member in _simple:
             fn = _simple[member]

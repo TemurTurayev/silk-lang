@@ -768,41 +768,27 @@ class Interpreter(MemberMixin):
                 return value.variant == pattern.member
             return False
 
-        if isinstance(pattern, NumberLiteral):
-            return value == pattern.value
-
-        if isinstance(pattern, StringLiteral):
-            return value == pattern.value
-
-        if isinstance(pattern, BoolLiteral):
+        if isinstance(pattern, (NumberLiteral, StringLiteral, BoolLiteral)):
             return value == pattern.value
 
         if isinstance(pattern, FunctionCall):
-            pattern_name = pattern.name.name if isinstance(pattern.name, Identifier) else pattern.name
+            pn = pattern.name.name if isinstance(pattern.name, Identifier) else pattern.name
+            def _bind_arg(val):
+                if pattern.args and len(pattern.args) == 1 and isinstance(pattern.args[0], Identifier):
+                    bindings[pattern.args[0].name] = val
             if isinstance(value, SilkResult):
-                if pattern_name == 'Ok' and value.is_ok:
-                    if pattern.args and len(pattern.args) == 1:
-                        arg = pattern.args[0]
-                        if isinstance(arg, Identifier):
-                            bindings[arg.name] = value.value
+                if pn == 'Ok' and value.is_ok:
+                    _bind_arg(value.value)
                     return True
-                if pattern_name == 'Err' and not value.is_ok:
-                    if pattern.args and len(pattern.args) == 1:
-                        arg = pattern.args[0]
-                        if isinstance(arg, Identifier):
-                            bindings[arg.name] = value.error
+                if pn == 'Err' and not value.is_ok:
+                    _bind_arg(value.error)
                     return True
                 return False
             if isinstance(value, SilkOption):
-                if pattern_name == 'Some' and value.is_some:
-                    if pattern.args and len(pattern.args) == 1:
-                        arg = pattern.args[0]
-                        if isinstance(arg, Identifier):
-                            bindings[arg.name] = value.value
+                if pn == 'Some' and value.is_some:
+                    _bind_arg(value.value)
                     return True
-                if pattern_name == 'None' and not value.is_some:
-                    return True
-                return False
+                return pn == 'None' and not value.is_some
             return False
 
         return False
