@@ -608,16 +608,9 @@ class MemberMixin:
                 return s.lower()
             return ('builtin', _case_convert)
         if member == 'truncateWords':
-            def _trunc_words(args, ctx):
-                words = obj.split()
-                n = int(args[0])
-                return obj if len(words) <= n else ' '.join(words[:n]) + '...'
-            return ('builtin', _trunc_words)
+            return ('builtin', lambda args, ctx: obj if len(w := obj.split()) <= int(args[0]) else ' '.join(w[:int(args[0])]) + '...')
         if member == 'isEmail':
-            def _is_email(args, ctx):
-                parts = obj.split('@')
-                return len(parts) == 2 and len(parts[0]) > 0 and '.' in parts[1]
-            return ('builtin', _is_email)
+            return ('builtin', lambda args, ctx: len(p := obj.split('@')) == 2 and len(p[0]) > 0 and '.' in p[1])
         if member == 'partition':
             return ('builtin', lambda args, ctx: list(obj.partition(args[0])))
         if member == 'commonPrefix':
@@ -672,9 +665,7 @@ class MemberMixin:
                 return (result + '000')[:4]
             return ('builtin', _soundex)
         if member == 'isUrl':
-            def _is_url(args, ctx):
-                return obj.startswith(('http://', 'https://')) and '.' in obj.split('//')[1]
-            return ('builtin', _is_url)
+            return ('builtin', lambda args, ctx: obj.startswith(('http://', 'https://')) and '.' in obj.split('//')[1])
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -694,45 +685,38 @@ class MemberMixin:
             'toBinary': lambda: bin(int(obj))[2:],
             'toHex': lambda: hex(int(obj))[2:],
             'toChar': lambda: chr(int(obj)),
+            'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))),
+            'digitCount': lambda: len(str(abs(int(obj)))),
         }
         if member in _simple:
             fn = _simple[member]
             return ('builtin', lambda args, ctx: fn())
-        if member == 'clamp':
-            return ('builtin', lambda args, ctx: max(args[0], min(obj, args[1])))
-        if member == 'clampMin':
-            return ('builtin', lambda args, ctx: max(obj, args[0]))
-        if member == 'clampMax':
-            return ('builtin', lambda args, ctx: min(obj, args[0]))
-        if member == 'toFixed':
-            return ('builtin', lambda args, ctx: f"{obj:.{int(args[0])}f}")
-        if member == 'pow':
-            return ('builtin', lambda args, ctx: obj ** int(args[0]))
-        if member == 'isBetween':
-            return ('builtin', lambda args, ctx: args[0] <= obj <= args[1])
+        _onearg = {
+            'clampMin': lambda a: max(obj, a[0]), 'clampMax': lambda a: min(obj, a[0]),
+            'toFixed': lambda a: f"{obj:.{int(a[0])}f}", 'pow': lambda a: obj ** int(a[0]),
+            'gcd': lambda a: math.gcd(int(obj), int(a[0])),
+            'clamp': lambda a: max(a[0], min(obj, a[1])),
+            'isBetween': lambda a: a[0] <= obj <= a[1],
+        }
+        if member in _onearg:
+            fn = _onearg[member]
+            return ('builtin', lambda args, ctx: fn(args))
         if member == 'lerp':
-            def _lerp(args, ctx):
-                result = obj + (args[0] - obj) * args[1]
-                return int(result) if result == int(result) else result
-            return ('builtin', _lerp)
+            return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)(obj + (args[0] - obj) * args[1]))
         if member == 'map':
             return ('builtin', lambda args, ctx: self._call_function(args[0], [obj]))
         if member in ('percent', 'percentOf'):
             def _pct(args, ctx):
-                result = (obj / 100) if member == 'percent' else (obj * args[0] / 100)
-                return int(result) if result == int(result) else result
+                r = (obj / 100) if member == 'percent' else (obj * args[0] / 100)
+                return int(r) if r == int(r) else r
             return ('builtin', _pct)
         if member == 'toPercent':
-            def _to_percent(args, ctx):
-                val = round(obj * 100, 10)
-                return f"{int(val) if val == int(val) else val}%"
-            return ('builtin', _to_percent)
+            return ('builtin', lambda args, ctx: f"{int(v) if (v := round(obj * 100, 10)) == int(v) else v}%")
         if member == 'toOrdinal':
             def _ordinal(args, ctx):
                 n = int(obj)
-                if 11 <= n % 100 <= 13:
-                    return f"{n}th"
-                return f"{n}{['th','st','nd','rd'][n % 10] if n % 10 < 4 else 'th'}"
+                s = 'th' if 11 <= n % 100 <= 13 else ['th','st','nd','rd'][n % 10] if n % 10 < 4 else 'th'
+                return f"{n}{s}"
             return ('builtin', _ordinal)
         if member == 'isPrime':
             def _is_prime(args, ctx):
@@ -764,8 +748,6 @@ class MemberMixin:
                     a, b = b, a + b
                 return a
             return ('builtin', _fibonacci)
-        if member == 'digitSum':
-            return ('builtin', lambda args, ctx: sum(int(d) for d in str(abs(int(obj)))))
         if member == 'toWords':
             def _to_words(args, ctx):
                 n = int(obj)
@@ -801,10 +783,6 @@ class MemberMixin:
                     steps += 1
                 return steps
             return ('builtin', _collatz)
-        if member == 'digitCount':
-            return ('builtin', lambda args, ctx: len(str(abs(int(obj)))))
-        if member == 'gcd':
-            return ('builtin', lambda args, ctx: math.gcd(int(obj), int(args[0])))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
