@@ -211,6 +211,8 @@ class MemberMixin:
             return ('builtin', _flatmap)
         if member == 'toSortedArray':
             return ('builtin', lambda args, ctx: [[k, obj[k]] for k in sorted(obj.keys())])
+        if member == 'sortByValue':
+            return ('builtin', lambda args, ctx: [[k, v] for k, v in sorted(obj.items(), key=lambda x: x[1])])
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -475,6 +477,11 @@ class MemberMixin:
             return ('builtin', _interpose)
         if member == 'transpose':
             return ('builtin', lambda args, ctx: [list(row) for row in zip(*obj)])
+        if member == 'combinations':
+            def _combinations(args, ctx):
+                from itertools import combinations as _c
+                return [list(c) for c in _c(obj, int(args[0]))]
+            return ('builtin', _combinations)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -640,10 +647,23 @@ class MemberMixin:
                 return prev[n]
             return ('builtin', _levenshtein)
         if member == 'hamming':
-            def _hamming(args, ctx):
-                other = args[0]
-                return sum(a != b for a, b in zip(obj, other))
-            return ('builtin', _hamming)
+            return ('builtin', lambda args, ctx: sum(a != b for a, b in zip(obj, args[0])))
+        if member == 'soundex':
+            def _soundex(args, ctx):
+                if not obj:
+                    return ''
+                codes = {'B':'1','F':'1','P':'1','V':'1','C':'2','G':'2','J':'2','K':'2',
+                    'Q':'2','S':'2','X':'2','Z':'2','D':'3','T':'3','L':'4','M':'5',
+                    'N':'5','R':'6'}
+                result = obj[0].upper()
+                prev = codes.get(obj[0].upper(), '0')
+                for ch in obj[1:]:
+                    code = codes.get(ch.upper(), '0')
+                    if code != '0' and code != prev:
+                        result += code
+                    prev = code if code != '0' else prev
+                return (result + '000')[:4]
+            return ('builtin', _soundex)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -770,6 +790,8 @@ class MemberMixin:
                     steps += 1
                 return steps
             return ('builtin', _collatz)
+        if member == 'digitCount':
+            return ('builtin', lambda args, ctx: len(str(abs(int(obj)))))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
