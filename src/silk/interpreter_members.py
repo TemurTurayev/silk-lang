@@ -118,8 +118,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj.get(args[0], args[1] if len(args) > 1 else None))
         if member == 'forEach':
             def _fe(args, ctx):
-                for k, v in obj.items():
-                    self._call_function(args[0], [k, v])
+                for k, v in obj.items(): self._call_function(args[0], [k, v])
             return ('builtin', _fe)
         if member == 'filter':
             return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if self._call_function(args[0], [k, v])})
@@ -131,14 +130,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {k: self._call_function(args[0], [v]) for k, v in obj.items()})
         if member == 'mapKeys':
             return ('builtin', lambda args, ctx: {self._call_function(args[0], [k]): v for k, v in obj.items()})
-        if member == 'filterValues':
-            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if self._call_function(args[0], [v])})
-        if member == 'filterKeys':
-            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if self._call_function(args[0], [k])})
-        if member == 'every':
-            return ('builtin', lambda args, ctx: all(self._call_function(args[0], [k, v]) for k, v in obj.items()))
-        if member == 'some':
-            return ('builtin', lambda args, ctx: any(self._call_function(args[0], [k, v]) for k, v in obj.items()))
+        if member in ('filterValues', 'filterKeys'):
+            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if self._call_function(args[0], [v if member == 'filterValues' else k])})
+        if member in ('every', 'some'):
+            return ('builtin', lambda args, ctx: (all if member == 'every' else any)(self._call_function(args[0], [k, v]) for k, v in obj.items()))
         if member in ('findKey', 'findValue'):
             def _find(args, ctx):
                 for k, v in obj.items():
@@ -146,17 +141,13 @@ class MemberMixin:
                         return k if member == 'findKey' else v
             return ('builtin', _find)
         if member == 'toJson':
-            def _to_json(args, ctx):
+            def _tj(args, ctx):
                 def _c(v):
-                    if isinstance(v, (type(None), bool, int, float, str)):
-                        return v
-                    if isinstance(v, list):
-                        return [_c(i) for i in v]
-                    if isinstance(v, dict):
-                        return {str(k): _c(val) for k, val in v.items()}
-                    return str(v)
+                    if isinstance(v, (type(None), bool, int, float, str)): return v
+                    if isinstance(v, list): return [_c(i) for i in v]
+                    return {str(k): _c(val) for k, val in v.items()} if isinstance(v, dict) else str(v)
                 return json.dumps(_c(obj))
-            return ('builtin', _to_json)
+            return ('builtin', _tj)
         if member == 'mapEntries':
             def _me(args, ctx):
                 return {(p := self._call_function(args[0], [k, v]))[0]: p[1] for k, v in obj.items()}
@@ -167,10 +158,9 @@ class MemberMixin:
             return ('builtin', _fm)
         if member == 'groupByValue':
             def _gbv(args, ctx):
-                groups = {}
-                for k, v in obj.items():
-                    groups.setdefault(v, []).append(k)
-                return groups
+                g = {}
+                for k, v in obj.items(): g.setdefault(v, []).append(k)
+                return g
             return ('builtin', _gbv)
         if member == 'deepMerge':
             def _dm(args, ctx):
@@ -193,6 +183,8 @@ class MemberMixin:
             return ('builtin', _ig)
         if member == 'diffKeys':
             return ('builtin', lambda args, ctx: [k for k in obj if k not in args[0]])
+        if member == 'commonKeys':
+            return ('builtin', lambda args, ctx: [k for k in obj if k in args[0]])
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -468,6 +460,8 @@ class MemberMixin:
                     else: r.append(g); g = [x]
                 return r + [g]
             return ('builtin', _gc)
+        if member in ('minBy', 'maxBy'):
+            return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -514,6 +508,7 @@ class MemberMixin:
             'charAt': lambda a: obj[int(a[0])],
             'charCodeAt': lambda a: ord(obj[int(a[0])]),
             'zfill': lambda a: obj.zfill(int(a[0])),
+            'countWords': lambda a: obj.split().count(a[0]),
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -620,15 +615,11 @@ class MemberMixin:
         if member == 'isUrl':
             return ('builtin', lambda args, ctx: obj.startswith(('http://', 'https://')) and '.' in obj.split('//')[1])
         if member == 'caesar':
-            def _caesar(args, ctx):
-                s = int(args[0])
-                return ''.join(chr((ord(c) - (65 if c.isupper() else 97) + s) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj)
-            return ('builtin', _caesar)
+            return ('builtin', lambda args, ctx: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + int(args[0])) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj))
         if member == 'charFrequency':
             def _cf(args, ctx):
                 f = {}
-                for c in obj:
-                    f[c] = f.get(c, 0) + 1
+                for c in obj: f[c] = f.get(c, 0) + 1
                 return f
             return ('builtin', _cf)
         if member == 'dedent':
@@ -784,6 +775,15 @@ class MemberMixin:
                 a, b = int(obj), int(args[0])
                 return a != b and _ds(a) == b and _ds(b) == a
             return ('builtin', _ia)
+        if member == 'primeFactors':
+            def _pf(args, ctx):
+                n, f, d = int(obj), [], 2
+                while d * d <= n:
+                    while n % d == 0: f.append(d); n //= d
+                    d += 1
+                if n > 1: f.append(n)
+                return f
+            return ('builtin', _pf)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
