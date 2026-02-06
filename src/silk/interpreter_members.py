@@ -604,22 +604,14 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: len(p := obj.split('@')) == 2 and len(p[0]) > 0 and '.' in p[1])
         if member == 'partition':
             return ('builtin', lambda args, ctx: list(obj.partition(args[0])))
-        if member == 'commonPrefix':
-            def _common_prefix(args, ctx):
-                other = args[0]
-                i = 0
-                while i < len(obj) and i < len(other) and obj[i] == other[i]:
+        if member in ('commonPrefix', 'commonSuffix'):
+            def _common(args, ctx):
+                other, i = args[0], 0
+                a, b = (obj, other) if member == 'commonPrefix' else (obj[::-1], other[::-1])
+                while i < len(a) and i < len(b) and a[i] == b[i]:
                     i += 1
-                return obj[:i]
-            return ('builtin', _common_prefix)
-        if member == 'commonSuffix':
-            def _common_suffix(args, ctx):
-                other = args[0]
-                i = 0
-                while i < len(obj) and i < len(other) and obj[-(i+1)] == other[-(i+1)]:
-                    i += 1
-                return obj[len(obj)-i:] if i else ''
-            return ('builtin', _common_suffix)
+                return obj[:i] if member == 'commonPrefix' else (obj[len(obj)-i:] if i else '')
+            return ('builtin', _common)
         if member == 'levenshtein':
             def _levenshtein(args, ctx):
                 other = args[0]
@@ -643,39 +635,30 @@ class MemberMixin:
             def _soundex(args, ctx):
                 if not obj:
                     return ''
-                codes = {'B':'1','F':'1','P':'1','V':'1','C':'2','G':'2','J':'2','K':'2',
-                    'Q':'2','S':'2','X':'2','Z':'2','D':'3','T':'3','L':'4','M':'5',
-                    'N':'5','R':'6'}
-                result = obj[0].upper()
-                prev = codes.get(obj[0].upper(), '0')
+                _c = {c: d for d, chars in enumerate('AEIOUYHW,BFPV,CGJKQSXZ,DT,L,MN,R'.split(','))
+                      for c in chars}
+                result, prev = obj[0].upper(), _c.get(obj[0].upper(), 0)
                 for ch in obj[1:]:
-                    code = codes.get(ch.upper(), '0')
-                    if code != '0' and code != prev:
-                        result += code
-                    prev = code if code != '0' else prev
+                    code = _c.get(ch.upper(), 0)
+                    if code > 0 and code != prev:
+                        result += str(code)
+                    prev = code if code > 0 else prev
                 return (result + '000')[:4]
             return ('builtin', _soundex)
         if member == 'isUrl':
             return ('builtin', lambda args, ctx: obj.startswith(('http://', 'https://')) and '.' in obj.split('//')[1])
         if member == 'caesar':
             def _caesar(args, ctx):
-                shift = int(args[0])
-                result = []
-                for ch in obj:
-                    if ch.isalpha():
-                        base = ord('A') if ch.isupper() else ord('a')
-                        result.append(chr((ord(ch) - base + shift) % 26 + base))
-                    else:
-                        result.append(ch)
-                return ''.join(result)
+                s = int(args[0])
+                return ''.join(chr((ord(c) - (65 if c.isupper() else 97) + s) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj)
             return ('builtin', _caesar)
         if member == 'charFrequency':
-            def _char_freq(args, ctx):
-                freq = {}
-                for ch in obj:
-                    freq[ch] = freq.get(ch, 0) + 1
-                return freq
-            return ('builtin', _char_freq)
+            def _cf(args, ctx):
+                f = {}
+                for c in obj:
+                    f[c] = f.get(c, 0) + 1
+                return f
+            return ('builtin', _cf)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -740,15 +723,7 @@ class MemberMixin:
                 return f"{n}{s}"
             return ('builtin', _ordinal)
         if member == 'isPrime':
-            def _is_prime(args, ctx):
-                n = int(obj)
-                if n < 2:
-                    return False
-                for i in range(2, int(n**0.5) + 1):
-                    if n % i == 0:
-                        return False
-                return True
-            return ('builtin', _is_prime)
+            return ('builtin', lambda args, ctx: int(obj) >= 2 and all(int(obj) % i for i in range(2, int(int(obj)**0.5) + 1)))
         if member == 'toRoman':
             def _roman(args, ctx):
                 n, result = int(obj), ''
@@ -760,68 +735,55 @@ class MemberMixin:
                 return result
             return ('builtin', _roman)
         if member == 'fibonacci':
-            def _fibonacci(args, ctx):
-                n = int(obj)
-                if n <= 0:
-                    return 0
+            def _fib(args, ctx):
                 a, b = 0, 1
-                for _ in range(n):
+                for _ in range(int(obj)):
                     a, b = b, a + b
                 return a
-            return ('builtin', _fibonacci)
+            return ('builtin', _fib)
         if member == 'toWords':
-            def _to_words(args, ctx):
+            def _tw(args, ctx):
                 n = int(obj)
-                if n == 0:
-                    return 'zero'
-                ones = ['','one','two','three','four','five','six','seven','eight','nine',
-                        'ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen',
-                        'seventeen','eighteen','nineteen']
-                tens = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']
-                def _chunk(num):
-                    if num == 0:
-                        return ''
-                    if num < 20:
-                        return ones[num]
-                    if num < 100:
-                        return tens[num // 10] + ('-' + ones[num % 10] if num % 10 else '')
-                    return ones[num // 100] + ' hundred' + (' ' + _chunk(num % 100) if num % 100 else '')
-                parts, scales = [], ['', ' thousand', ' million', ' billion']
-                i, rem = 0, abs(n)
+                if n == 0: return 'zero'
+                _o = ['','one','two','three','four','five','six','seven','eight','nine','ten',
+                      'eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen']
+                _t = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']
+                def _ch(num):
+                    if num == 0: return ''
+                    if num < 20: return _o[num]
+                    if num < 100: return _t[num // 10] + ('-' + _o[num % 10] if num % 10 else '')
+                    return _o[num // 100] + ' hundred' + (' ' + _ch(num % 100) if num % 100 else '')
+                parts, scales, i, rem = [], ['', ' thousand', ' million', ' billion'], 0, abs(n)
                 while rem > 0:
-                    if rem % 1000:
-                        parts.append(_chunk(rem % 1000) + scales[i])
-                    rem //= 1000
-                    i += 1
-                result = ' '.join(reversed(parts))
-                return ('negative ' + result) if n < 0 else result
-            return ('builtin', _to_words)
+                    if rem % 1000: parts.append(_ch(rem % 1000) + scales[i])
+                    rem //= 1000; i += 1
+                r = ' '.join(reversed(parts))
+                return ('negative ' + r) if n < 0 else r
+            return ('builtin', _tw)
         if member == 'collatz':
             def _collatz(args, ctx):
-                n, steps = int(obj), 0
+                n, s = int(obj), 0
                 while n != 1:
-                    n = n // 2 if n % 2 == 0 else 3 * n + 1
-                    steps += 1
-                return steps
+                    n, s = (n // 2, s + 1) if n % 2 == 0 else (3 * n + 1, s + 1)
+                return s
             return ('builtin', _collatz)
         if member == 'nthPrime':
-            def _nth_prime(args, ctx):
-                count, candidate = 0, 2
+            def _np(args, ctx):
+                c, p = 0, 2
                 while True:
-                    if all(candidate % i for i in range(2, int(candidate**0.5) + 1)):
-                        count += 1
-                        if count == int(obj):
-                            return candidate
-                    candidate += 1
-            return ('builtin', _nth_prime)
+                    if all(p % i for i in range(2, int(p**0.5) + 1)):
+                        c += 1
+                        if c == int(obj):
+                            return p
+                    p += 1
+            return ('builtin', _np)
         if member == 'isHappy':
-            def _is_happy(args, ctx):
+            def _ih(args, ctx):
                 n, seen = int(obj), set()
                 while n != 1 and n not in seen:
-                    seen.add(n)
-                    n = sum(int(d) ** 2 for d in str(n))
+                    seen.add(n); n = sum(int(d) ** 2 for d in str(n))
                 return n == 1
-            return ('builtin', _is_happy)
+            return ('builtin', _ih)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
