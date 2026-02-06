@@ -141,6 +141,27 @@ class MemberMixin:
             def _arr_some(args, ctx):
                 return any(self._call_function(args[0], [item]) for item in obj)
             return ('builtin', _arr_some)
+        if member == 'flat':
+            def _arr_flat(args, ctx):
+                result = []
+                for item in obj:
+                    if isinstance(item, list):
+                        result.extend(item)
+                    else:
+                        result.append(item)
+                return result
+            return ('builtin', _arr_flat)
+        if member == 'flatMap':
+            def _arr_flat_map(args, ctx):
+                result = []
+                for item in obj:
+                    mapped = self._call_function(args[0], [item])
+                    if isinstance(mapped, list):
+                        result.extend(mapped)
+                    else:
+                        result.append(mapped)
+                return result
+            return ('builtin', _arr_flat_map)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -195,6 +216,10 @@ class MemberMixin:
                 except ValueError:
                     raise RuntimeError_(f"Cannot convert '{obj}' to float")
             return ('builtin', _to_float)
+        if member == 'reverse':
+            return ('builtin', lambda args, ctx: obj[::-1])
+        if member == 'isEmpty':
+            return ('builtin', lambda args, ctx: len(obj) == 0)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:

@@ -262,6 +262,12 @@ def builtin_reduce(args: list, context: dict) -> Any:
     return acc
 
 
+def builtin_zip(args: list, context: dict) -> list:
+    """zip(a, b) -> [[a[0], b[0]], [a[1], b[1]], ...]"""
+    a, b = args[0], args[1]
+    return [list(pair) for pair in zip(a, b)]
+
+
 # Export all core built-ins
 CORE_BUILTINS: dict[str, Callable] = {
     'print': builtin_print,
@@ -288,4 +294,5 @@ CORE_BUILTINS: dict[str, Callable] = {
     'Ok': builtin_ok,
     'Err': builtin_err,
     'reduce': builtin_reduce,
+    'zip': builtin_zip,
 }

@@ -426,3 +426,14 @@ class DestructureLetArray:
     names: list  # list of str
     rest_name: str | None  # name for ...rest, or None
     value: Any
+
+
+# ═══════════════════════════════════════════════════════════
+# LAMBDA
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class LambdaExpr:
+    """Lambda shorthand: |params| expr."""
+    params: list  # list of param names (strings)
+    body_expr: Any  # single expression

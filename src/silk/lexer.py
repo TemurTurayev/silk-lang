@@ -351,7 +351,7 @@ class Lexer:
                     self.advance()
                     self.add_token(TokenType.PIPE)
                 else:
-                    raise LexerError("Expected '>' after '|' (pipe operator is |>)", self.line, self.col)
+                    self.add_token(TokenType.BAR)
 
             else:
                 raise LexerError(f"Unexpected character '{ch}'", self.line, self.col)

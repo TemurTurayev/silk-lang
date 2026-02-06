@@ -54,6 +54,7 @@ class TokenType(Enum):
     SPREAD = auto()
     TYPEOF = auto()
     DOTDOT = auto()
+    BAR = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()

@@ -24,7 +24,7 @@ from .ast import (
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
     MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
-    RangeExpr, TypeofExpr, DestructureLetArray
+    RangeExpr, TypeofExpr, DestructureLetArray, LambdaExpr
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -383,6 +383,10 @@ class Interpreter(MemberMixin):
         elif isinstance(node, TypeofExpr):
             val = self.evaluate(node.expr, env)
             return self._typeof(val)
+        elif isinstance(node, LambdaExpr):
+            params = [(p, None, None) for p in node.params]
+            body = [ReturnStatement(node.body_expr)]
+            return ('function', params, body, env)
         elif isinstance(node, FunctionDef):
             return ('function', node.params, node.body, env)
         else:

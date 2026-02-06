@@ -16,7 +16,7 @@ from .ast import (
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
     MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
-    RangeExpr, TypeofExpr, DestructureLetArray
+    RangeExpr, TypeofExpr, DestructureLetArray, LambdaExpr
 )
 from .parser_types import TypeParserMixin
 
@@ -550,6 +550,8 @@ class Parser(TypeParserMixin):
             return self.parse_fstring()
         elif t.type == TokenType.FN:
             return self.parse_anonymous_fn()
+        elif t.type == TokenType.BAR:
+            return self.parse_lambda()
         else:
             raise ParseError(
                 f"Unexpected token: {t.type.name} ({t.value!r})",
@@ -559,6 +561,17 @@ class Parser(TypeParserMixin):
     # ═══════════════════════════════════════════════════════════
     # Literal / special parsers
     # ═══════════════════════════════════════════════════════════
+
+    def parse_lambda(self) -> LambdaExpr:
+        self.eat(TokenType.BAR)
+        params = []
+        while not self.match(TokenType.BAR):
+            params.append(self.eat(TokenType.IDENTIFIER).value)
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+        self.eat(TokenType.BAR)
+        body = self.parse_expression()
+        return LambdaExpr(params, body)
 
     def parse_anonymous_fn(self) -> FunctionDef:
         self.eat(TokenType.FN)
