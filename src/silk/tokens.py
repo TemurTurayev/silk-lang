@@ -49,6 +49,7 @@ class TokenType(Enum):
     PIPE = auto()
     TRY = auto()
     CATCH = auto()
+    THROW = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -125,6 +126,7 @@ KEYWORDS: dict[str, TokenType] = {
     'assert': TokenType.ASSERT,
     'try': TokenType.TRY,
     'catch': TokenType.CATCH,
+    'throw': TokenType.THROW,
 }
 
 

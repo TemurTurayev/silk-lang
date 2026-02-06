@@ -15,7 +15,8 @@ from .ast import (
     MemberAccess, StructDef, StructField, StructInstance,
     EnumDef, EnumVariant, MatchExpr, MatchArm, ImplBlock,
     InterfaceDef, InterfaceMethodSig, ImportStmt,
-    TestBlock, AssertStatement, StringInterp, TryCatch
+    TestBlock, AssertStatement, StringInterp, TryCatch,
+    HashMapLiteral, ThrowStatement
 )
 
 
@@ -66,7 +67,6 @@ class Parser:
         """
         if not self.match(TokenType.LBRACE):
             return False
-        # Skip newlines when peeking
         offset = 1
         while self.peek(offset).type == TokenType.NEWLINE:
             offset += 1
@@ -78,6 +78,30 @@ class Parser:
             offset += 1
         after_ident = self.peek(offset)
         return after_ident.type == TokenType.COLON
+
+    def is_hashmap_start(self) -> bool:
+        """Check if current position starts a hashmap literal.
+
+        Detects {:} (empty) or { literal_key : ... } patterns.
+        """
+        if not self.match(TokenType.LBRACE):
+            return False
+        offset = 1
+        while self.peek(offset).type == TokenType.NEWLINE:
+            offset += 1
+        next_token = self.peek(offset)
+        # {:} is an empty hashmap
+        if next_token.type == TokenType.COLON:
+            return True
+        # {literal_key: value} is a hashmap
+        if next_token.type in (
+            TokenType.STRING, TokenType.INT, TokenType.FLOAT, TokenType.BOOL
+        ):
+            offset += 1
+            while self.peek(offset).type == TokenType.NEWLINE:
+                offset += 1
+            return self.peek(offset).type == TokenType.COLON
+        return False
 
     def parse(self) -> Program:
         """Parse the entire program."""
@@ -136,6 +160,8 @@ class Parser:
             return self.parse_assert()
         elif t.type == TokenType.TRY:
             return self.parse_try_catch()
+        elif t.type == TokenType.THROW:
+            return self.parse_throw()
         else:
             return self.parse_expression_statement()
 
@@ -425,6 +451,12 @@ class Parser:
         catch_body = self.parse_block()
         return TryCatch(try_body, error_name, catch_body)
 
+    def parse_throw(self) -> ThrowStatement:
+        """Parse throw statement: throw expression"""
+        self.eat(TokenType.THROW)
+        expression = self.parse_expression()
+        return ThrowStatement(expression)
+
     def parse_match(self) -> MatchExpr:
         """Parse match expression."""
         self.eat(TokenType.MATCH)
@@ -700,6 +732,9 @@ class Parser:
         elif t.type == TokenType.LBRACKET:
             return self.parse_array_literal()
 
+        elif t.type == TokenType.LBRACE and self.is_hashmap_start():
+            return self.parse_hashmap()
+
         elif t.type == TokenType.MATCH:
             return self.parse_match()
 
@@ -783,6 +818,30 @@ class Parser:
             parts.append(StringLiteral(""))
 
         return StringInterp(parts)
+
+    def parse_hashmap(self) -> HashMapLiteral:
+        """Parse hashmap literal: {:} or {key: val, ...}."""
+        self.eat(TokenType.LBRACE)
+        self.skip_newlines()
+        pairs = []
+
+        # Handle {:} empty map
+        if self.match(TokenType.COLON):
+            self.eat(TokenType.COLON)
+            self.eat(TokenType.RBRACE)
+            return HashMapLiteral(pairs)
+
+        while not self.match(TokenType.RBRACE):
+            key = self.parse_expression()
+            self.eat(TokenType.COLON)
+            value = self.parse_expression()
+            pairs.append((key, value))
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+            self.skip_newlines()
+
+        self.eat(TokenType.RBRACE)
+        return HashMapLiteral(pairs)
 
     def parse_array_literal(self) -> ArrayLiteral:
         """Parse array literal [...]."""

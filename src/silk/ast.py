@@ -329,3 +329,19 @@ class TryCatch:
     try_body: list
     error_name: str
     catch_body: list
+
+
+@dataclass
+class ThrowStatement:
+    """Throw statement: throw expression."""
+    expression: Any
+
+
+# ═══════════════════════════════════════════════════════════
+# HASHMAP
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class HashMapLiteral:
+    """HashMap literal: {"key": value, ...} or {:} for empty."""
+    pairs: list  # list of (key_expr, value_expr) tuples

@@ -21,6 +21,19 @@ def silk_repr(value: Any) -> str:
     if isinstance(value, list):
         items = ', '.join(silk_repr(item) for item in value)
         return f"[{items}]"
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+
+        def _key_repr(k):
+            if isinstance(k, str):
+                return f'"{k}"'
+            return silk_repr(k)
+
+        pairs = ', '.join(
+            f'{_key_repr(k)}: {silk_repr(v)}' for k, v in value.items()
+        )
+        return '{' + pairs + '}'
     if isinstance(value, tuple) and len(value) >= 1:
         if value[0] == 'function':
             return "<function>"
@@ -73,6 +86,8 @@ def builtin_type(args: list, context: dict) -> str:
         return "str"
     elif isinstance(v, list):
         return "array"
+    elif isinstance(v, dict):
+        return "map"
     elif v is None:
         return "null"
     elif isinstance(v, tuple) and v[0] in ('function', 'builtin'):
@@ -103,9 +118,9 @@ def builtin_bool(args: list, context: dict) -> bool:
 def builtin_len(args: list, context: dict) -> int:
     """Get length of array or string."""
     v = args[0]
-    if isinstance(v, (str, list)):
+    if isinstance(v, (str, list, dict)):
         return len(v)
-    raise RuntimeError_(f"len() expects string or array, got {type(v).__name__}")
+    raise RuntimeError_(f"len() expects string, array, or map, got {type(v).__name__}")
 
 
 def builtin_range(args: list, context: dict) -> list:
@@ -200,9 +215,20 @@ def builtin_filter(args: list, context: dict) -> list:
     return [item for item in arr if call(func, [item])]
 
 
+def builtin_foreach(args: list, context: dict) -> None:
+    """Iterate over an array: forEach(arr, fn)."""
+    arr, func = args[0], args[1]
+    if not isinstance(arr, list):
+        raise RuntimeError_("forEach() expects an array as first argument")
+    call = context['call_function']
+    for item in arr:
+        call(func, [item])
+    return None
+
+
 def builtin_some(args: list, context: dict) -> Any:
     """Create Some(value) Option."""
-    from ..interpreter import SilkOption
+    from ..types import SilkOption
     if len(args) != 1:
         raise RuntimeError_("Some() takes exactly 1 argument")
     return SilkOption(args[0], is_some=True)
@@ -210,7 +236,7 @@ def builtin_some(args: list, context: dict) -> Any:
 
 def builtin_ok(args: list, context: dict) -> Any:
     """Create Ok(value) Result."""
-    from ..interpreter import SilkResult
+    from ..types import SilkResult
     if len(args) != 1:
         raise RuntimeError_("Ok() takes exactly 1 argument")
     return SilkResult(value=args[0], is_ok=True)
@@ -218,7 +244,7 @@ def builtin_ok(args: list, context: dict) -> Any:
 
 def builtin_err(args: list, context: dict) -> Any:
     """Create Err(error) Result."""
-    from ..interpreter import SilkResult
+    from ..types import SilkResult
     if len(args) != 1:
         raise RuntimeError_("Err() takes exactly 1 argument")
     return SilkResult(error=args[0], is_ok=False)
@@ -245,6 +271,7 @@ CORE_BUILTINS: dict[str, Callable] = {
     'contains': builtin_contains,
     'map': builtin_map,
     'filter': builtin_filter,
+    'forEach': builtin_foreach,
     'Some': builtin_some,
     'Ok': builtin_ok,
     'Err': builtin_err,

@@ -12,8 +12,10 @@ class SilkError(Exception):
         self.message = message
         self.line = line
         self.col = col
-        prefix = f"[line {line}]" if line else ""
-        super().__init__(f"{prefix} {message}")
+        if line:
+            super().__init__(f"[line {line}] {message}")
+        else:
+            super().__init__(message)
 
 
 class LexerError(SilkError):
