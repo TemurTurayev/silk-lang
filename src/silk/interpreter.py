@@ -189,9 +189,11 @@ class Interpreter(MemberMixin):
             iterable = self.evaluate(node.iterable, env)
             if not isinstance(iterable, list):
                 raise RuntimeError_("for..in requires an iterable (array or range)")
-            for item in iterable:
+            for i, item in enumerate(iterable):
                 loop_env = Environment(parent=env)
                 loop_env.define(node.var_name, item)
+                if node.index_name is not None:
+                    loop_env.define(node.index_name, i)
                 try:
                     self.execute_block(node.body, loop_env)
                 except BreakSignal:

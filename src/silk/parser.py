@@ -267,11 +267,16 @@ class Parser(TypeParserMixin):
 
     def parse_for(self) -> ForLoop:
         self.eat(TokenType.FOR)
-        var_name = self.eat(TokenType.IDENTIFIER).value
+        first = self.eat(TokenType.IDENTIFIER).value
+        index_name = None
+        if self.match(TokenType.COMMA):
+            self.eat(TokenType.COMMA)
+            index_name = first
+            first = self.eat(TokenType.IDENTIFIER).value
         self.eat(TokenType.IN)
         iterable = self.parse_expression()
         body = self.parse_block()
-        return ForLoop(var_name, iterable, body)
+        return ForLoop(first, iterable, body, index_name)
 
     def parse_return(self) -> ReturnStatement:
         self.eat(TokenType.RETURN)

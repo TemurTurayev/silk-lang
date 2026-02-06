@@ -69,6 +69,16 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: args[0] in obj)
         if member == 'delete':
             return ('builtin', lambda args, ctx: obj.pop(args[0], None))
+        if member == 'entries':
+            return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
+        if member == 'merge':
+            return ('builtin', lambda args, ctx: {**obj, **args[0]})
+        if member == 'forEach':
+            def _map_foreach(args, ctx):
+                for k, v in obj.items():
+                    self._call_function(args[0], [k, v])
+                return None
+            return ('builtin', _map_foreach)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -162,6 +172,12 @@ class MemberMixin:
                         result.append(mapped)
                 return result
             return ('builtin', _arr_flat_map)
+        if member == 'enumerate':
+            return ('builtin', lambda args, ctx: [[i, v] for i, v in enumerate(obj)])
+        if member == 'take':
+            return ('builtin', lambda args, ctx: obj[:int(args[0])])
+        if member == 'skip':
+            return ('builtin', lambda args, ctx: obj[int(args[0]):])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -220,6 +236,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj[::-1])
         if member == 'isEmpty':
             return ('builtin', lambda args, ctx: len(obj) == 0)
+        if member == 'replaceAll':
+            return ('builtin', lambda args, ctx: obj.replace(args[0], args[1]))
+        if member == 'includes':
+            return ('builtin', lambda args, ctx: args[0] in obj)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:

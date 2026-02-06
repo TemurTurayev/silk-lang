@@ -168,10 +168,11 @@ class WhileLoop:
 
 @dataclass
 class ForLoop:
-    """For-in loop."""
+    """For-in loop. index_name is set for 'for i, val in ...' form."""
     var_name: str
     iterable: Any
     body: list
+    index_name: str | None = None
 
 
 @dataclass
