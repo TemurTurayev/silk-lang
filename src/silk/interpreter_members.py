@@ -188,6 +188,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {**obj, **args[0]})
         if member == 'size':
             return ('builtin', lambda args, ctx: len(obj))
+        if member == 'clear':
+            return ('builtin', lambda args, ctx: {})
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -508,6 +510,8 @@ class MemberMixin:
                     result[pair[0]] = pair[1]
                 return result
             return ('builtin', _arr_associate)
+        if member == 'toString':
+            return ('builtin', lambda args, ctx: silk_repr(obj))
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -656,6 +660,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj.replace(args[0], args[1], 1))
         if member == 'isBlank':
             return ('builtin', lambda args, ctx: len(obj.strip()) == 0)
+        if member == 'swapCase':
+            return ('builtin', lambda args, ctx: obj.swapcase())
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -727,6 +733,8 @@ class MemberMixin:
                 val = int(val) if val == int(val) else val
                 return f"{val}%"
             return ('builtin', _to_percent)
+        if member == 'factorial':
+            return ('builtin', lambda args, ctx: math.factorial(int(obj)))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
