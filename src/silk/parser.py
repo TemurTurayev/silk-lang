@@ -16,7 +16,8 @@ from .ast import (
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
     MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
-    RangeExpr, TypeofExpr, DestructureLetArray, LambdaExpr
+    RangeExpr, TypeofExpr, DestructureLetArray, LambdaExpr,
+    OptionalChain
 )
 from .parser_types import TypeParserMixin
 
@@ -398,11 +399,19 @@ class Parser(TypeParserMixin):
         return self.parse_pipe()
 
     def parse_pipe(self):
-        left = self.parse_or()
+        left = self.parse_null_coalesce()
         while self.match(TokenType.PIPE):
             self.pos += 1
             right = self.parse_or()
             left = BinaryOp(left, '|>', right)
+        return left
+
+    def parse_null_coalesce(self):
+        left = self.parse_or()
+        while self.match(TokenType.DOUBLE_QUESTION):
+            self.pos += 1
+            right = self.parse_or()
+            left = BinaryOp(left, '??', right)
         return left
 
     def parse_or(self):
@@ -515,6 +524,10 @@ class Parser(TypeParserMixin):
                     instance = self.parse_struct_instance(member)
                     instance.struct_ref = expr
                     expr = instance
+            elif self.match(TokenType.QUESTION_DOT):
+                self.eat(TokenType.QUESTION_DOT)
+                member = self.eat(TokenType.IDENTIFIER).value
+                expr = OptionalChain(expr, member)
             else:
                 break
         return expr

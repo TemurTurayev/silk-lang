@@ -438,3 +438,14 @@ class LambdaExpr:
     """Lambda shorthand: |params| expr."""
     params: list  # list of param names (strings)
     body_expr: Any  # single expression
+
+
+# ═══════════════════════════════════════════════════════════
+# OPTIONAL CHAINING
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class OptionalChain:
+    """Optional chaining: obj?.member -> null if obj is null."""
+    obj: Any
+    member: str

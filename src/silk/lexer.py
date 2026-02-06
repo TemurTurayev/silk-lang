@@ -68,6 +68,26 @@ class Lexer:
 
         return False
 
+    def read_triple_string(self) -> None:
+        """Read a triple-quoted multi-line string."""
+        self.advance()  # consume first "
+        self.advance()  # consume second "
+        self.advance()  # consume third "
+        start_line = self.line
+        result: list[str] = []
+
+        while self.pos < len(self.source):
+            if (self.source[self.pos] == '"'
+                    and self.peek(1) == '"' and self.peek(2) == '"'):
+                self.advance()  # consume first "
+                self.advance()  # consume second "
+                self.advance()  # consume third "
+                self.add_token(TokenType.STRING, ''.join(result))
+                return
+            result.append(self.advance())
+
+        raise LexerError("Unterminated triple-quoted string", start_line, self.col)
+
     def read_string(self) -> None:
         """Read a string literal."""
         quote = self.advance()  # consume opening quote
@@ -210,6 +230,9 @@ class Lexer:
                 self.add_token(TokenType.NEWLINE)
                 self.advance()
 
+            elif ch == '"' and self.peek(1) == '"' and self.peek(2) == '"':
+                self.read_triple_string()
+
             elif ch in ('"', "'"):
                 self.read_string()
 
@@ -282,6 +305,17 @@ class Lexer:
                     self.add_token(TokenType.NEQ)
                 else:
                     raise LexerError(f"Unexpected character '!'", self.line, self.col)
+
+            elif ch == '?':
+                self.advance()
+                if self.pos < len(self.source) and self.source[self.pos] == '.':
+                    self.advance()
+                    self.add_token(TokenType.QUESTION_DOT)
+                elif self.pos < len(self.source) and self.source[self.pos] == '?':
+                    self.advance()
+                    self.add_token(TokenType.DOUBLE_QUESTION)
+                else:
+                    raise LexerError("Expected '.' or '?' after '?'", self.line, self.col)
 
             elif ch == '<':
                 self.advance()

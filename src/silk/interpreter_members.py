@@ -15,7 +15,29 @@ from .types import (
 
 
 class MemberMixin:
-    """Mixin providing _eval_member and _eval_method for Interpreter."""
+    """Mixin providing _eval_member, _eval_method, and _typeof for Interpreter."""
+
+    def _typeof(self, val: Any) -> str:
+        """Return the type name of a value."""
+        if val is None:
+            return "null"
+        if isinstance(val, bool):
+            return "bool"
+        if isinstance(val, int):
+            return "int"
+        if isinstance(val, float):
+            return "float"
+        if isinstance(val, str):
+            return "string"
+        if isinstance(val, list):
+            return "array"
+        if isinstance(val, dict):
+            return "map"
+        if isinstance(val, SilkStruct):
+            return val.struct_name
+        if isinstance(val, tuple) and val[0] in ('function', 'builtin'):
+            return "function"
+        return "unknown"
 
     def _eval_member(self, obj: Any, member: str, env: 'Environment | None' = None) -> Any:
         """Evaluate member access."""
@@ -178,6 +200,18 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj[:int(args[0])])
         if member == 'skip':
             return ('builtin', lambda args, ctx: obj[int(args[0]):])
+        if member == 'unique':
+            def _arr_unique(args, ctx):
+                seen = []
+                for item in obj:
+                    if item not in seen:
+                        seen.append(item)
+                return seen
+            return ('builtin', _arr_unique)
+        if member == 'count':
+            def _arr_count(args, ctx):
+                return sum(1 for item in obj if self._call_function(args[0], [item]))
+            return ('builtin', _arr_count)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:

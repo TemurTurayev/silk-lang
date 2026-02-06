@@ -55,6 +55,8 @@ class TokenType(Enum):
     TYPEOF = auto()
     DOTDOT = auto()
     BAR = auto()
+    QUESTION_DOT = auto()
+    DOUBLE_QUESTION = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()

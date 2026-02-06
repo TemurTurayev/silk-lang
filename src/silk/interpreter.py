@@ -24,7 +24,8 @@ from .ast import (
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
     MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
-    RangeExpr, TypeofExpr, DestructureLetArray, LambdaExpr
+    RangeExpr, TypeofExpr, DestructureLetArray, LambdaExpr,
+    OptionalChain
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -331,6 +332,11 @@ class Interpreter(MemberMixin):
         elif isinstance(node, MemberAccess):
             obj = self.evaluate(node.obj, env)
             return self._eval_member(obj, node.member, env)
+        elif isinstance(node, OptionalChain):
+            obj = self.evaluate(node.obj, env)
+            if obj is None:
+                return None
+            return self._eval_member(obj, node.member, env)
         elif isinstance(node, StructInstance):
             if node.struct_ref is not None:
                 struct_def = self.evaluate(node.struct_ref, env)
@@ -402,6 +408,8 @@ class Interpreter(MemberMixin):
             func = self.evaluate(node.right, env)
             return self._call_function(func, [left])
 
+        if node.op == '??':
+            return left if left is not None else self.evaluate(node.right, env)
         if node.op == 'and':
             return left if not truthy(left) else self.evaluate(node.right, env)
         if node.op == 'or':
@@ -442,28 +450,6 @@ class Interpreter(MemberMixin):
         if node.op == 'not':
             return not truthy(val)
         raise RuntimeError_(f"Unknown unary operator: {node.op}")
-
-    def _typeof(self, val: Any) -> str:
-        """Return the type name of a value."""
-        if val is None:
-            return "null"
-        if isinstance(val, bool):
-            return "bool"
-        if isinstance(val, int):
-            return "int"
-        if isinstance(val, float):
-            return "float"
-        if isinstance(val, str):
-            return "string"
-        if isinstance(val, list):
-            return "array"
-        if isinstance(val, dict):
-            return "map"
-        if isinstance(val, SilkStruct):
-            return val.struct_name
-        if isinstance(val, tuple) and val[0] in ('function', 'builtin'):
-            return "function"
-        return "unknown"
 
     def _eval_call(self, node: FunctionCall, env: Environment) -> Any:
         """Evaluate function call."""
