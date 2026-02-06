@@ -5,6 +5,7 @@ Handles member access and method calls on built-in types
 (dict, list, string) and user-defined types (struct, enum).
 """
 
+import math
 from typing import Any
 
 from .errors import RuntimeError_
@@ -61,6 +62,9 @@ class MemberMixin:
 
         if isinstance(obj, str):
             return self._eval_string_member(obj, member)
+
+        if isinstance(obj, (int, float)):
+            return self._eval_number_member(obj, member)
 
         raise RuntimeError_(f"'{type(obj).__name__}' has no member '{member}'")
 
@@ -232,15 +236,21 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: max(obj))
         if member == 'sum':
             return ('builtin', lambda args, ctx: sum(obj))
+        if member == 'first':
+            return ('builtin', lambda args, ctx: obj[0] if obj else None)
+        if member == 'last':
+            return ('builtin', lambda args, ctx: obj[-1] if obj else None)
+        if member == 'isEmpty':
+            return ('builtin', lambda args, ctx: len(obj) == 0)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
         """Evaluate member access on a string."""
         if member == 'length':
             return len(obj)
-        if member == 'upper':
+        if member in ('upper', 'toUpper'):
             return ('builtin', lambda args, ctx: obj.upper())
-        if member == 'lower':
+        if member in ('lower', 'toLower'):
             return ('builtin', lambda args, ctx: obj.lower())
         if member in ('strip', 'trim'):
             return ('builtin', lambda args, ctx: obj.strip())
@@ -303,6 +313,18 @@ class MemberMixin:
         if member == 'charCodeAt':
             return ('builtin', lambda args, ctx: ord(obj[int(args[0])]))
         raise RuntimeError_(f"'str' has no member '{member}'")
+
+    def _eval_number_member(self, obj: int | float, member: str) -> Any:
+        """Evaluate member access on a number."""
+        if member == 'abs':
+            return ('builtin', lambda args, ctx: abs(obj))
+        if member == 'floor':
+            return ('builtin', lambda args, ctx: math.floor(obj))
+        if member == 'ceil':
+            return ('builtin', lambda args, ctx: math.ceil(obj))
+        if member == 'round':
+            return ('builtin', lambda args, ctx: round(obj))
+        raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
         """Evaluate method call."""

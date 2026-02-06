@@ -304,7 +304,7 @@ class Lexer:
                     self.advance()
                     self.add_token(TokenType.NEQ)
                 else:
-                    raise LexerError(f"Unexpected character '!'", self.line, self.col)
+                    self.add_token(TokenType.NOT)
 
             elif ch == '?':
                 self.advance()

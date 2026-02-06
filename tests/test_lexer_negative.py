@@ -41,11 +41,12 @@ class TestLexerErrors:
             lex.tokenize()
         assert "Unexpected character" in str(exc_info.value)
 
-    def test_standalone_exclamation(self, lexer):
+    def test_standalone_exclamation_as_not(self, lexer):
+        """! is now a valid NOT operator (alias for 'not')."""
+        from silk.tokens import TokenType
         lex = lexer("!")
-        with pytest.raises(LexerError) as exc_info:
-            lex.tokenize()
-        assert "Unexpected character '!'" in str(exc_info.value)
+        tokens = lex.tokenize()
+        assert tokens[0].type == TokenType.NOT
 
     def test_error_includes_line_number(self, lexer):
         lex = lexer('let x = 1\nlet y = "unterminated')
