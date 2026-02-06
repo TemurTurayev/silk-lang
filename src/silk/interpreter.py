@@ -5,6 +5,7 @@ Tree-walking interpreter for the Silk language.
 """
 
 from typing import Any
+from pathlib import Path
 
 from .lexer import Lexer
 from .parser import Parser
@@ -19,10 +20,11 @@ from .ast import (
     ForLoop, FunctionDef, FunctionCall, ReturnStatement,
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructInstance, EnumDef,
-    MatchExpr, MatchArm, ImplBlock, InterfaceDef
+    MatchExpr, MatchArm, ImplBlock, InterfaceDef, ImportStmt
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
+from .resolver import ModuleResolver, ModuleNotFoundError as ResolverNotFound
 
 
 class Environment:
@@ -156,6 +158,10 @@ class Interpreter:
     def __init__(self):
         self.global_env = Environment()
         self.output_lines: list[str] = []  # Capture output for testing
+        self._module_cache: dict[str, Environment] = {}  # path -> module env
+        self._loading_set: set[str] = set()  # circular import detection
+        self._resolver = ModuleResolver()
+        self._current_file: Path | None = None  # track importing file
         self._setup_builtins()
 
     def _setup_builtins(self) -> None:
@@ -166,8 +172,14 @@ class Interpreter:
         # Register None as a SilkOption
         self.global_env.define('None', SilkOption(is_some=False), mutable=False)
 
-    def run(self, source: str) -> bool:
-        """Run Silk source code."""
+    def run(self, source: str, file_path: Path | None = None) -> bool:
+        """Run Silk source code.
+
+        Args:
+            source: The Silk source code string
+            file_path: Optional path to the source file (needed for imports)
+        """
+        self._current_file = file_path
         try:
             lexer = Lexer(source)
             tokens = lexer.tokenize()
@@ -306,6 +318,9 @@ class Interpreter:
                     node.struct_name, node.interface_name, methods, env
                 )
 
+        elif isinstance(node, ImportStmt):
+            self._execute_import(node, env)
+
         else:
             # Expression statement
             self.evaluate(node, env)
@@ -353,7 +368,11 @@ class Interpreter:
             obj = self.evaluate(node.obj, env)
             return self._eval_member(obj, node.member, env)
         elif isinstance(node, StructInstance):
-            struct_def = env.get(node.struct_name)
+            # Resolve struct def: namespaced (struct_ref) or simple name
+            if node.struct_ref is not None:
+                struct_def = self.evaluate(node.struct_ref, env)
+            else:
+                struct_def = env.get(node.struct_name)
             if not isinstance(struct_def, tuple) or struct_def[0] != 'struct_def':
                 raise RuntimeError_(f"'{node.struct_name}' is not a struct")
 
@@ -461,8 +480,113 @@ class Interpreter:
 
         raise RuntimeError_("Not a callable function")
 
+    def _execute_import(self, node: ImportStmt, env: Environment) -> None:
+        """Execute an import statement."""
+        importing_file = self._current_file
+        if importing_file is None:
+            raise RuntimeError_(
+                "Cannot use 'import' without a file context. "
+                "Run from a .silk file, not the REPL."
+            )
+
+        # Resolve the path
+        try:
+            resolved = self._resolver.resolve(node.path, importing_file)
+        except ResolverNotFound as e:
+            raise RuntimeError_(str(e))
+
+        # Native module (silk/ path with no file on disk)
+        if resolved is None:
+            native_env = self._load_native_module(node.path)
+            if native_env is None:
+                raise RuntimeError_(f"Module '{node.path}' not found")
+            alias = node.alias or ModuleResolver.default_alias(node.path)
+            env.define(alias, native_env, mutable=False)
+            return
+
+        abs_path = str(resolved.resolve())
+
+        # Circular import detection
+        if abs_path in self._loading_set:
+            raise RuntimeError_(
+                f"Circular import detected: '{node.path}'"
+            )
+
+        # Check cache
+        if abs_path not in self._module_cache:
+            # Execute module
+            self._loading_set.add(abs_path)
+            try:
+                source = resolved.read_text()
+                module_env = Environment()
+                # Module gets its own builtins
+                for name, func in ALL_BUILTINS.items():
+                    module_env.define(name, ('builtin', func), mutable=False)
+                module_env.define('None', SilkOption(is_some=False), mutable=False)
+
+                # Save and restore current file context
+                prev_file = self._current_file
+                self._current_file = resolved
+
+                lexer = Lexer(source)
+                tokens = lexer.tokenize()
+                parser = Parser(tokens)
+                ast = parser.parse()
+                self.execute(ast, module_env)
+
+                self._current_file = prev_file
+                self._module_cache[abs_path] = module_env
+            finally:
+                self._loading_set.discard(abs_path)
+
+        # Bind module environment under alias
+        alias = node.alias or ModuleResolver.default_alias(node.path)
+        env.define(alias, self._module_cache[abs_path], mutable=False)
+
+    def _load_native_module(self, path: str) -> Environment | None:
+        """Load a Python-backed native module.
+
+        Returns an Environment with the module's bindings, or None if unknown.
+        """
+        # Cache key for native modules
+        cache_key = f"native:{path}"
+        if cache_key in self._module_cache:
+            return self._module_cache[cache_key]
+
+        from .builtins.math_funcs import MATH_BUILTINS
+        from .builtins.medical import MEDICAL_BUILTINS
+        import math as pymath
+
+        native_modules = {
+            "silk/math": {
+                **{name: func for name, func in MATH_BUILTINS.items()},
+                # Override pi to be a value, not a function
+                "pi": None,
+            },
+            "silk/medical": {
+                name: func for name, func in MEDICAL_BUILTINS.items()
+            },
+        }
+
+        if path not in native_modules:
+            return None
+
+        env = Environment()
+        for name, func in native_modules[path].items():
+            if name == "pi":
+                env.define(name, pymath.pi, mutable=False)
+            else:
+                env.define(name, ('builtin', func), mutable=False)
+
+        self._module_cache[cache_key] = env
+        return env
+
     def _eval_member(self, obj: Any, member: str, env: Environment | None = None) -> Any:
         """Evaluate member access."""
+        # Handle module namespace access
+        if isinstance(obj, Environment):
+            return obj.get(member)
+
         # Handle struct field access and methods
         if isinstance(obj, SilkStruct):
             if member in obj.fields:
@@ -517,6 +641,8 @@ class Interpreter:
         if isinstance(member, tuple) and member[0] == 'bound_method':
             _, func, self_obj = member
             return self._call_function(func, [self_obj] + args)
+        if isinstance(member, tuple) and member[0] == 'function':
+            return self._call_function(member, args)
         return member
 
     def _eval_match(self, node: MatchExpr, env: Environment) -> Any:

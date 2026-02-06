@@ -14,7 +14,7 @@ from .ast import (
     BreakStatement, ContinueStatement, IndexAccess, IndexAssign,
     MemberAccess, StructDef, StructField, StructInstance,
     EnumDef, EnumVariant, MatchExpr, MatchArm, ImplBlock,
-    InterfaceDef, InterfaceMethodSig
+    InterfaceDef, InterfaceMethodSig, ImportStmt
 )
 
 
@@ -124,6 +124,8 @@ class Parser:
             return self.parse_impl_block()
         elif t.type == TokenType.INTERFACE:
             return self.parse_interface_def()
+        elif t.type == TokenType.IMPORT:
+            return self.parse_import()
         else:
             return self.parse_expression_statement()
 
@@ -351,6 +353,45 @@ class Parser:
         self.eat(TokenType.RBRACE)
         return ImplBlock(struct_name, methods, interface_name)
 
+    def parse_import(self) -> ImportStmt:
+        """Parse import statement: import path or import path as alias.
+
+        Path is built from IDENTIFIER and SLASH tokens.
+        Supports: import silk/math, import ./utils, import ./lib/geo as geo
+        """
+        self.eat(TokenType.IMPORT)
+
+        # Build path from tokens
+        parts = []
+
+        # Handle ./ prefix for relative imports
+        if self.match(TokenType.DOT):
+            self.eat(TokenType.DOT)
+            self.eat(TokenType.SLASH)
+            parts.append(".")
+
+        # Consume first identifier
+        parts.append(self.eat(TokenType.IDENTIFIER).value)
+
+        # Consume remaining /identifier segments
+        while self.match(TokenType.SLASH):
+            self.eat(TokenType.SLASH)
+            parts.append(self.eat(TokenType.IDENTIFIER).value)
+
+        # Build path string
+        if parts[0] == ".":
+            path = "./" + "/".join(parts[1:])
+        else:
+            path = "/".join(parts)
+
+        # Optional alias
+        alias = None
+        if self.match(TokenType.AS):
+            self.eat(TokenType.AS)
+            alias = self.eat(TokenType.IDENTIFIER).value
+
+        return ImportStmt(path, alias)
+
     def parse_match(self) -> MatchExpr:
         """Parse match expression."""
         self.eat(TokenType.MATCH)
@@ -566,6 +607,12 @@ class Parser:
                 self.eat(TokenType.DOT)
                 member = self.eat(TokenType.IDENTIFIER).value
                 expr = MemberAccess(expr, member)
+
+                # Check for namespaced struct: mod.Struct { field: value }
+                if self.match(TokenType.LBRACE) and self.is_struct_instance_start():
+                    instance = self.parse_struct_instance(member)
+                    instance.struct_ref = expr
+                    expr = instance
 
             else:
                 break

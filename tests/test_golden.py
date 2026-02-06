@@ -29,7 +29,7 @@ def test_golden(name, silk_file, expected_file):
     expected = expected_file.read_text().strip()
 
     interp = Interpreter()
-    interp.run(source)
+    interp.run(source, file_path=silk_file)
 
     actual = "\n".join(interp.output_lines).strip()
     assert actual == expected, f"Golden test '{name}' failed:\nExpected:\n{expected}\n\nActual:\n{actual}"

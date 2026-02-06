@@ -1,0 +1,23 @@
+// Phase 2 Module System: imports, namespaces, native modules
+
+import silk/math as m
+import ./dosing_lib as dosing
+
+// Use native math module
+print(m.ceil(3.2))
+print(m.floor(3.8))
+
+// Use file-based module with struct
+let amoxicillin = dosing.Medication {
+    name: "Amoxicillin",
+    mg_per_kg: 25.0,
+    max_dose: 500.0
+}
+
+let patient_weight = 18.0
+let dose = dosing.calculate_dose(amoxicillin, patient_weight)
+print(dosing.format_prescription(amoxicillin, dose))
+
+// Dose exceeds max
+let heavy_dose = dosing.calculate_dose(amoxicillin, 30.0)
+print(dosing.format_prescription(amoxicillin, heavy_dose))

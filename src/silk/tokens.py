@@ -42,6 +42,7 @@ class TokenType(Enum):
     MATCH = auto()
     IMPL = auto()
     INTERFACE = auto()
+    AS = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -113,6 +114,7 @@ KEYWORDS: dict[str, TokenType] = {
     'match': TokenType.MATCH,
     'impl': TokenType.IMPL,
     'interface': TokenType.INTERFACE,
+    'as': TokenType.AS,
 }
 
 

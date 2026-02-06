@@ -208,6 +208,7 @@ class StructInstance:
     """Struct instantiation: Name { field: value, ... }"""
     struct_name: str
     field_values: dict  # field_name -> value expression
+    struct_ref: Any = None  # Optional expression resolving to struct def (namespaced)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -256,6 +257,17 @@ class ImplBlock:
     struct_name: str
     methods: list  # list of FunctionDef
     interface_name: str | None = None
+
+
+# ═══════════════════════════════════════════════════════════
+# MODULES
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class ImportStmt:
+    """Import statement: import path or import path as alias."""
+    path: str  # e.g. "silk/math", "./utils", "./lib/geometry"
+    alias: str | None  # explicit alias, or None (default = last segment)
 
 
 # ═══════════════════════════════════════════════════════════

@@ -1,0 +1,19 @@
+// Dosing library module - demonstrates Silk's module system
+
+struct Medication {
+    name: str,
+    mg_per_kg: float,
+    max_dose: float
+}
+
+fn calculate_dose(med, weight) {
+    let dose = med.mg_per_kg * weight
+    if dose > med.max_dose {
+        return med.max_dose
+    }
+    return dose
+}
+
+fn format_prescription(med, dose) {
+    return med.name + " " + str(dose) + "mg"
+}

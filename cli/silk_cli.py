@@ -171,15 +171,16 @@ def repl():
 
 def run_file(filepath: str) -> bool:
     """Run a Silk source file."""
-    if not os.path.exists(filepath):
+    from pathlib import Path
+
+    file_path = Path(filepath).resolve()
+    if not file_path.exists():
         print(f"❌ File not found: {filepath}")
         return False
 
-    with open(filepath, 'r', encoding='utf-8') as f:
-        source = f.read()
-
+    source = file_path.read_text(encoding='utf-8')
     interpreter = Interpreter()
-    return interpreter.run(source)
+    return interpreter.run(source, file_path=file_path)
 
 
 def show_help():
