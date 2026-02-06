@@ -226,6 +226,12 @@ class MemberMixin:
                     groups[key].append(item)
                 return groups
             return ('builtin', _arr_group_by)
+        if member == 'min':
+            return ('builtin', lambda args, ctx: min(obj))
+        if member == 'max':
+            return ('builtin', lambda args, ctx: max(obj))
+        if member == 'sum':
+            return ('builtin', lambda args, ctx: sum(obj))
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -238,6 +244,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj.lower())
         if member in ('strip', 'trim'):
             return ('builtin', lambda args, ctx: obj.strip())
+        if member == 'trim_start':
+            return ('builtin', lambda args, ctx: obj.lstrip())
+        if member == 'trim_end':
+            return ('builtin', lambda args, ctx: obj.rstrip())
         if member == 'replace':
             return ('builtin', lambda args, ctx: obj.replace(args[0], args[1]))
         if member == 'starts_with':

@@ -221,6 +221,7 @@ class Parser(TypeParserMixin):
     def _parse_params(self) -> list:
         """Parse function parameter list. Returns (name, type_hint, default_expr) tuples."""
         params = []
+        self.skip_newlines()
         while not self.match(TokenType.RPAREN):
             pname = self.eat(TokenType.IDENTIFIER).value
             ptype = None
@@ -235,6 +236,7 @@ class Parser(TypeParserMixin):
             params.append((pname, ptype, default))
             if self.match(TokenType.COMMA):
                 self.eat(TokenType.COMMA)
+            self.skip_newlines()
         return params
 
     def parse_function_def(self) -> FunctionDef:
@@ -530,11 +532,13 @@ class Parser(TypeParserMixin):
         while True:
             if self.match(TokenType.LPAREN):
                 self.eat(TokenType.LPAREN)
+                self.skip_newlines()
                 args = []
                 while not self.match(TokenType.RPAREN):
                     args.append(self.parse_expression())
                     if self.match(TokenType.COMMA):
                         self.eat(TokenType.COMMA)
+                    self.skip_newlines()
                 self.eat(TokenType.RPAREN)
                 expr = FunctionCall(expr, args)
             elif self.match(TokenType.LBRACKET):
@@ -681,6 +685,7 @@ class Parser(TypeParserMixin):
 
     def parse_array_literal(self):
         self.eat(TokenType.LBRACKET)
+        self.skip_newlines()
         elements = []
         while not self.match(TokenType.RBRACKET):
             if self.match(TokenType.SPREAD):
@@ -690,5 +695,6 @@ class Parser(TypeParserMixin):
                 elements.append(self.parse_expression())
             if self.match(TokenType.COMMA):
                 self.eat(TokenType.COMMA)
+            self.skip_newlines()
         self.eat(TokenType.RBRACKET)
         return ArrayLiteral(elements)
