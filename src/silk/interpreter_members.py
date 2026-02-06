@@ -482,6 +482,14 @@ class MemberMixin:
             return ('builtin', _arr_shuffle)
         if member == 'difference':
             return ('builtin', lambda args, ctx: [x for x in obj if x not in args[0]])
+        if member == 'sortDescending':
+            return ('builtin', lambda args, ctx: sorted(obj, reverse=True))
+        if member == 'forEachIndexed':
+            def _arr_foreach_indexed(args, ctx):
+                for i, item in enumerate(obj):
+                    self._call_function(args[0], [i, item])
+                return None
+            return ('builtin', _arr_foreach_indexed)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -667,6 +675,8 @@ class MemberMixin:
                 result = obj + (target - obj) * t
                 return int(result) if result == int(result) else result
             return ('builtin', _lerp)
+        if member == 'map':
+            return ('builtin', lambda args, ctx: self._call_function(args[0], [obj]))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:

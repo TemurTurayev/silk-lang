@@ -58,6 +58,7 @@ class TokenType(Enum):
     QUESTION_DOT = auto()
     DOUBLE_QUESTION = auto()
     DO = auto()
+    CONST = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -138,6 +139,7 @@ KEYWORDS: dict[str, TokenType] = {
     'then': TokenType.THEN,
     'typeof': TokenType.TYPEOF,
     'do': TokenType.DO,
+    'const': TokenType.CONST,
 }
 
 

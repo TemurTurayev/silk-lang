@@ -109,6 +109,8 @@ class Parser(TypeParserMixin):
 
         if t.type == TokenType.LET:
             return self.parse_let()
+        elif t.type == TokenType.CONST:
+            return self.parse_const()
         elif t.type == TokenType.FN:
             if self.peek().type == TokenType.IDENTIFIER:
                 return self.parse_function_def()
@@ -188,6 +190,18 @@ class Parser(TypeParserMixin):
         self.eat(TokenType.ASSIGN)
         value = self.parse_expression()
         return LetDeclaration(name, mutable, type_hint, value)
+
+    def parse_const(self):
+        self.eat(TokenType.CONST)
+        name = self.eat(TokenType.IDENTIFIER).value
+        type_hint = None
+        if self.match(TokenType.COLON):
+            self.eat(TokenType.COLON)
+            type_hint = self.current().value
+            self.pos += 1
+        self.eat(TokenType.ASSIGN)
+        value = self.parse_expression()
+        return LetDeclaration(name, False, type_hint, value)
 
     def _parse_destructure_array(self) -> DestructureLetArray:
         self.eat(TokenType.LBRACKET)
