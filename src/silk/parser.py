@@ -168,6 +168,9 @@ class Parser(TypeParserMixin):
             return self.parse_repeat()
         elif t.type == TokenType.GUARD:
             return self.parse_guard()
+        elif t.type == TokenType.LOOP:
+            self.eat(TokenType.LOOP)
+            return WhileLoop(BoolLiteral(True), self.parse_block())
         else:
             return self.parse_expression_statement()
 

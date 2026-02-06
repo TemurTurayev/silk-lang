@@ -196,6 +196,14 @@ class MemberMixin:
             def _fk(args, ctx):
                 return {k: v for k, v in obj.items() if self._call_function(args[0], [k])}
             return ('builtin', _fk)
+        if member == 'mapEntries':
+            def _me(args, ctx):
+                result = {}
+                for k, v in obj.items():
+                    pair = self._call_function(args[0], [k, v])
+                    result[pair[0]] = pair[1]
+                return result
+            return ('builtin', _me)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -714,6 +722,14 @@ class MemberMixin:
                 parts = re.split(r'[-_\s]+', obj)
                 return ' '.join(w.capitalize() for w in parts)
             return ('builtin', _title)
+        if member == 'truncateWords':
+            def _trunc_words(args, ctx):
+                words = obj.split()
+                n = int(args[0])
+                if len(words) <= n:
+                    return obj
+                return ' '.join(words[:n]) + '...'
+            return ('builtin', _trunc_words)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -763,6 +779,13 @@ class MemberMixin:
                 val = round(obj * 100, 10)
                 return f"{int(val) if val == int(val) else val}%"
             return ('builtin', _to_percent)
+        if member == 'toOrdinal':
+            def _ordinal(args, ctx):
+                n = int(obj)
+                if 11 <= n % 100 <= 13:
+                    return f"{n}th"
+                return f"{n}{['th','st','nd','rd'][n % 10] if n % 10 < 4 else 'th'}"
+            return ('builtin', _ordinal)
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:

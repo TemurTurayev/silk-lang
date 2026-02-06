@@ -62,6 +62,7 @@ class TokenType(Enum):
     UNLESS = auto()
     REPEAT = auto()
     GUARD = auto()
+    LOOP = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -146,6 +147,7 @@ KEYWORDS: dict[str, TokenType] = {
     'unless': TokenType.UNLESS,
     'repeat': TokenType.REPEAT,
     'guard': TokenType.GUARD,
+    'loop': TokenType.LOOP,
 }
 
 
