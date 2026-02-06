@@ -126,6 +126,12 @@ class MemberMixin:
                 return sum(1 for k, v in obj.items()
                            if self._call_function(args[0], [k, v]))
             return ('builtin', _map_count)
+        if member == 'toArray':
+            return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
+        if member == 'mapValues':
+            def _map_values(args, ctx):
+                return {k: self._call_function(args[0], [v]) for k, v in obj.items()}
+            return ('builtin', _map_values)
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -287,6 +293,13 @@ class MemberMixin:
                 size = int(args[0])
                 return [obj[i:i + size] for i in range(len(obj) - size + 1)]
             return ('builtin', _arr_window)
+        if member == 'partition':
+            def _arr_partition(args, ctx):
+                yes, no = [], []
+                for item in obj:
+                    (yes if self._call_function(args[0], [item]) else no).append(item)
+                return [yes, no]
+            return ('builtin', _arr_partition)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -363,6 +376,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isdigit())
         if member == 'isAlpha':
             return ('builtin', lambda args, ctx: len(obj) > 0 and obj.isalpha())
+        if member == 'title':
+            return ('builtin', lambda args, ctx: obj.title())
+        if member == 'capitalize':
+            return ('builtin', lambda args, ctx: obj.capitalize())
+        if member == 'words':
+            return ('builtin', lambda args, ctx: obj.split())
         if member == 'format':
             def _format(args, ctx):
                 result = obj
