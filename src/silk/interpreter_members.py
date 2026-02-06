@@ -131,6 +131,16 @@ class MemberMixin:
                         return i
                 return -1
             return ('builtin', _arr_find_index)
+        if member == 'sort':
+            return ('builtin', lambda args, ctx: sorted(obj))
+        if member == 'every':
+            def _arr_every(args, ctx):
+                return all(self._call_function(args[0], [item]) for item in obj)
+            return ('builtin', _arr_every)
+        if member == 'some':
+            def _arr_some(args, ctx):
+                return any(self._call_function(args[0], [item]) for item in obj)
+            return ('builtin', _arr_some)
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:

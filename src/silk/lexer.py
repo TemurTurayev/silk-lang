@@ -337,6 +337,10 @@ class Lexer:
                     self.advance()  # second .
                     self.advance()  # third .
                     self.add_token(TokenType.SPREAD)
+                elif self.peek(1) == '.':
+                    self.advance()  # first .
+                    self.advance()  # second .
+                    self.add_token(TokenType.DOTDOT)
                 else:
                     self.advance()
                     self.add_token(TokenType.DOT)

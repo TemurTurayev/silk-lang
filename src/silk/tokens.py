@@ -52,6 +52,8 @@ class TokenType(Enum):
     THROW = auto()
     THEN = auto()
     SPREAD = auto()
+    TYPEOF = auto()
+    DOTDOT = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()
@@ -130,6 +132,7 @@ KEYWORDS: dict[str, TokenType] = {
     'catch': TokenType.CATCH,
     'throw': TokenType.THROW,
     'then': TokenType.THEN,
+    'typeof': TokenType.TYPEOF,
 }
 
 

@@ -23,7 +23,8 @@ from .ast import (
     MatchExpr, MatchArm, ImplBlock, InterfaceDef, ImportStmt,
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
-    MemberCompoundAssign, IndexCompoundAssign, SpreadExpr
+    MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
+    RangeExpr, TypeofExpr, DestructureLetArray
 )
 from .builtins import ALL_BUILTINS
 from .builtins.core import silk_repr
@@ -78,6 +79,16 @@ class Interpreter(MemberMixin):
         elif isinstance(node, LetDeclaration):
             value = self.evaluate(node.value, env)
             env.define(node.name, value, mutable=node.mutable)
+
+        elif isinstance(node, DestructureLetArray):
+            value = self.evaluate(node.value, env)
+            if not isinstance(value, list):
+                raise RuntimeError_("Destructuring requires an array")
+            for i, name in enumerate(node.names):
+                env.define(name, value[i] if i < len(value) else None)
+            if node.rest_name is not None:
+                rest = value[len(node.names):]
+                env.define(node.rest_name, rest)
 
         elif isinstance(node, Assignment):
             value = self.evaluate(node.value, env)
@@ -365,6 +376,13 @@ class Interpreter(MemberMixin):
                 return self.evaluate(node.then_expr, env)
             else:
                 return self.evaluate(node.else_expr, env)
+        elif isinstance(node, RangeExpr):
+            start = int(self.evaluate(node.start, env))
+            end = int(self.evaluate(node.end, env))
+            return list(range(start, end))
+        elif isinstance(node, TypeofExpr):
+            val = self.evaluate(node.expr, env)
+            return self._typeof(val)
         elif isinstance(node, FunctionDef):
             return ('function', node.params, node.body, env)
         else:
@@ -418,6 +436,28 @@ class Interpreter(MemberMixin):
         if node.op == 'not':
             return not truthy(val)
         raise RuntimeError_(f"Unknown unary operator: {node.op}")
+
+    def _typeof(self, val: Any) -> str:
+        """Return the type name of a value."""
+        if val is None:
+            return "null"
+        if isinstance(val, bool):
+            return "bool"
+        if isinstance(val, int):
+            return "int"
+        if isinstance(val, float):
+            return "float"
+        if isinstance(val, str):
+            return "string"
+        if isinstance(val, list):
+            return "array"
+        if isinstance(val, dict):
+            return "map"
+        if isinstance(val, SilkStruct):
+            return val.struct_name
+        if isinstance(val, tuple) and val[0] in ('function', 'builtin'):
+            return "function"
+        return "unknown"
 
     def _eval_call(self, node: FunctionCall, env: Environment) -> Any:
         """Evaluate function call."""

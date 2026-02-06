@@ -393,3 +393,36 @@ class TernaryExpr:
 class SpreadExpr:
     """Spread expression: ...expr (used inside array literals)."""
     expr: Any
+
+
+# ═══════════════════════════════════════════════════════════
+# RANGE
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class RangeExpr:
+    """Range expression: start..end (exclusive end)."""
+    start: Any
+    end: Any
+
+
+# ═══════════════════════════════════════════════════════════
+# TYPEOF
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class TypeofExpr:
+    """Typeof expression: typeof expr -> string."""
+    expr: Any
+
+
+# ═══════════════════════════════════════════════════════════
+# DESTRUCTURING
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class DestructureLetArray:
+    """Destructuring let: let [a, b, ...rest] = expr."""
+    names: list  # list of str
+    rest_name: str | None  # name for ...rest, or None
+    value: Any

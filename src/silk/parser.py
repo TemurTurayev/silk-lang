@@ -15,7 +15,8 @@ from .ast import (
     MemberAccess, ImportStmt,
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
-    MemberCompoundAssign, IndexCompoundAssign, SpreadExpr
+    MemberCompoundAssign, IndexCompoundAssign, SpreadExpr,
+    RangeExpr, TypeofExpr, DestructureLetArray
 )
 from .parser_types import TypeParserMixin
 
@@ -165,12 +166,14 @@ class Parser(TypeParserMixin):
     # Statement parsers
     # ═══════════════════════════════════════════════════════════
 
-    def parse_let(self) -> LetDeclaration:
+    def parse_let(self):
         self.eat(TokenType.LET)
         mutable = False
         if self.match(TokenType.MUT):
             self.eat(TokenType.MUT)
             mutable = True
+        if self.match(TokenType.LBRACKET):
+            return self._parse_destructure_array()
         name = self.eat(TokenType.IDENTIFIER).value
         type_hint = None
         if self.match(TokenType.COLON):
@@ -180,6 +183,23 @@ class Parser(TypeParserMixin):
         self.eat(TokenType.ASSIGN)
         value = self.parse_expression()
         return LetDeclaration(name, mutable, type_hint, value)
+
+    def _parse_destructure_array(self) -> DestructureLetArray:
+        self.eat(TokenType.LBRACKET)
+        names = []
+        rest_name = None
+        while not self.match(TokenType.RBRACKET):
+            if self.match(TokenType.SPREAD):
+                self.eat(TokenType.SPREAD)
+                rest_name = self.eat(TokenType.IDENTIFIER).value
+            else:
+                names.append(self.eat(TokenType.IDENTIFIER).value)
+            if self.match(TokenType.COMMA):
+                self.eat(TokenType.COMMA)
+        self.eat(TokenType.RBRACKET)
+        self.eat(TokenType.ASSIGN)
+        value = self.parse_expression()
+        return DestructureLetArray(names, rest_name, value)
 
     def _parse_params(self) -> list:
         """Parse function parameter list. Returns (name, type_hint, default_expr) tuples."""
@@ -403,7 +423,7 @@ class Parser(TypeParserMixin):
         return self.parse_comparison()
 
     def parse_comparison(self):
-        left = self.parse_addition()
+        left = self.parse_range()
         while self.match(
             TokenType.EQ, TokenType.NEQ, TokenType.LT,
             TokenType.GT, TokenType.LTE, TokenType.GTE
@@ -415,8 +435,16 @@ class Parser(TypeParserMixin):
             }
             op = op_map[self.current().type]
             self.pos += 1
-            right = self.parse_addition()
+            right = self.parse_range()
             left = BinaryOp(left, op, right)
+        return left
+
+    def parse_range(self):
+        left = self.parse_addition()
+        if self.match(TokenType.DOTDOT):
+            self.pos += 1
+            right = self.parse_addition()
+            return RangeExpr(left, right)
         return left
 
     def parse_addition(self):
@@ -452,6 +480,9 @@ class Parser(TypeParserMixin):
         if self.match(TokenType.MINUS):
             self.pos += 1
             return UnaryOp('-', self.parse_unary())
+        if self.match(TokenType.TYPEOF):
+            self.pos += 1
+            return TypeofExpr(self.parse_unary())
         return self.parse_postfix()
 
     def parse_postfix(self):
