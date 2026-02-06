@@ -332,8 +332,14 @@ class Lexer:
                 self.add_token(TokenType.COLON)
 
             elif ch == '.':
-                self.advance()
-                self.add_token(TokenType.DOT)
+                if self.peek(1) == '.' and self.peek(2) == '.':
+                    self.advance()  # first .
+                    self.advance()  # second .
+                    self.advance()  # third .
+                    self.add_token(TokenType.SPREAD)
+                else:
+                    self.advance()
+                    self.add_token(TokenType.DOT)
 
             elif ch == '|':
                 self.advance()

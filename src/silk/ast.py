@@ -383,3 +383,13 @@ class TernaryExpr:
     condition: Any
     then_expr: Any
     else_expr: Any
+
+
+# ═══════════════════════════════════════════════════════════
+# SPREAD
+# ═══════════════════════════════════════════════════════════
+
+@dataclass
+class SpreadExpr:
+    """Spread expression: ...expr (used inside array literals)."""
+    expr: Any

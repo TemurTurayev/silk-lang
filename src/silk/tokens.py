@@ -51,6 +51,7 @@ class TokenType(Enum):
     CATCH = auto()
     THROW = auto()
     THEN = auto()
+    SPREAD = auto()
 
     # Type annotations (reserved for future)
     TYPE_INT = auto()

@@ -15,7 +15,7 @@ from .ast import (
     MemberAccess, ImportStmt,
     TestBlock, AssertStatement, StringInterp, TryCatch,
     HashMapLiteral, ThrowStatement, TernaryExpr, MemberAssign,
-    MemberCompoundAssign, IndexCompoundAssign
+    MemberCompoundAssign, IndexCompoundAssign, SpreadExpr
 )
 from .parser_types import TypeParserMixin
 
@@ -595,7 +595,11 @@ class Parser(TypeParserMixin):
         self.eat(TokenType.LBRACKET)
         elements = []
         while not self.match(TokenType.RBRACKET):
-            elements.append(self.parse_expression())
+            if self.match(TokenType.SPREAD):
+                self.eat(TokenType.SPREAD)
+                elements.append(SpreadExpr(self.parse_expression()))
+            else:
+                elements.append(self.parse_expression())
             if self.match(TokenType.COMMA):
                 self.eat(TokenType.COMMA)
         self.eat(TokenType.RBRACKET)
