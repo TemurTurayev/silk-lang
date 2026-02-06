@@ -87,134 +87,84 @@ class MemberMixin:
 
     def _eval_dict_member(self, obj: dict, member: str) -> Any:
         """Evaluate member access on a dict."""
-        if member == 'length':
+        if member in ('length', 'size'):
             return len(obj)
-        if member == 'keys':
-            return ('builtin', lambda args, ctx: list(obj.keys()))
-        if member == 'values':
-            return ('builtin', lambda args, ctx: list(obj.values()))
-        if member == 'has':
-            return ('builtin', lambda args, ctx: args[0] in obj)
-        if member == 'delete':
-            return ('builtin', lambda args, ctx: obj.pop(args[0], None))
+        _noarg = {
+            'keys': lambda: list(obj.keys()), 'values': lambda: list(obj.values()),
+            'isEmpty': lambda: len(obj) == 0, 'clear': lambda: {},
+            'invert': lambda: {v: k for k, v in obj.items()},
+            'toSortedArray': lambda: [[k, obj[k]] for k in sorted(obj.keys())],
+            'sortByValue': lambda: [[k, v] for k, v in sorted(obj.items(), key=lambda x: x[1])],
+            'toQueryString': lambda: '&'.join(f"{k}={v}" for k, v in obj.items()),
+            'toFormattedString': lambda: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
+        }
+        if member in _noarg:
+            fn = _noarg[member]
+            return ('builtin', lambda args, ctx: fn())
+        _onearg = {
+            'has': lambda a: a[0] in obj, 'delete': lambda a: obj.pop(a[0], None),
+            'pick': lambda a: {k: obj[k] for k in a[0] if k in obj},
+            'omit': lambda a: {k: v for k, v in obj.items() if k not in a[0]},
+            'defaults': lambda a: {**a[0], **obj},
+        }
         if member in ('entries', 'toArray'):
             return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
         if member in ('merge', 'update'):
             return ('builtin', lambda args, ctx: {**obj, **args[0]})
+        if member in _onearg:
+            fn = _onearg[member]
+            return ('builtin', lambda args, ctx: fn(args))
+        if member == 'get':
+            return ('builtin', lambda args, ctx: obj.get(args[0], args[1] if len(args) > 1 else None))
         if member == 'forEach':
-            def _map_foreach(args, ctx):
+            def _fe(args, ctx):
                 for k, v in obj.items():
                     self._call_function(args[0], [k, v])
-                return None
-            return ('builtin', _map_foreach)
-        if member == 'get':
-            return ('builtin', lambda args, ctx: obj.get(
-                args[0], args[1] if len(args) > 1 else None
-            ))
+            return ('builtin', _fe)
         if member == 'filter':
-            def _map_filter(args, ctx):
-                return {k: v for k, v in obj.items()
-                        if self._call_function(args[0], [k, v])}
-            return ('builtin', _map_filter)
+            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if self._call_function(args[0], [k, v])})
         if member == 'map':
-            def _map_map(args, ctx):
-                return {k: self._call_function(args[0], [k, v])
-                        for k, v in obj.items()}
-            return ('builtin', _map_map)
-        if member == 'isEmpty':
-            return ('builtin', lambda args, ctx: len(obj) == 0)
+            return ('builtin', lambda args, ctx: {k: self._call_function(args[0], [k, v]) for k, v in obj.items()})
         if member == 'count':
-            def _map_count(args, ctx):
-                return sum(1 for k, v in obj.items()
-                           if self._call_function(args[0], [k, v]))
-            return ('builtin', _map_count)
+            return ('builtin', lambda args, ctx: sum(1 for k, v in obj.items() if self._call_function(args[0], [k, v])))
         if member == 'mapValues':
-            def _map_values(args, ctx):
-                return {k: self._call_function(args[0], [v]) for k, v in obj.items()}
-            return ('builtin', _map_values)
-        if member == 'pick':
-            return ('builtin', lambda args, ctx: {k: obj[k] for k in args[0] if k in obj})
-        if member == 'omit':
-            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if k not in args[0]})
-        if member == 'invert':
-            return ('builtin', lambda args, ctx: {v: k for k, v in obj.items()})
-        if member == 'findKey':
-            def _map_find_key(args, ctx):
-                for k, v in obj.items():
-                    if self._call_function(args[0], [k, v]):
-                        return k
-                return None
-            return ('builtin', _map_find_key)
-        if member == 'findValue':
-            def _map_find_value(args, ctx):
-                for k, v in obj.items():
-                    if self._call_function(args[0], [k, v]):
-                        return v
-                return None
-            return ('builtin', _map_find_value)
-        if member == 'defaults':
-            return ('builtin', lambda args, ctx: {**args[0], **obj})
-        if member == 'every':
-            def _map_every(args, ctx):
-                return all(self._call_function(args[0], [k, v]) for k, v in obj.items())
-            return ('builtin', _map_every)
-        if member == 'some':
-            def _map_some(args, ctx):
-                return any(self._call_function(args[0], [k, v]) for k, v in obj.items())
-            return ('builtin', _map_some)
+            return ('builtin', lambda args, ctx: {k: self._call_function(args[0], [v]) for k, v in obj.items()})
         if member == 'mapKeys':
-            def _map_keys(args, ctx):
-                return {self._call_function(args[0], [k]): v for k, v in obj.items()}
-            return ('builtin', _map_keys)
+            return ('builtin', lambda args, ctx: {self._call_function(args[0], [k]): v for k, v in obj.items()})
+        if member == 'filterValues':
+            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if self._call_function(args[0], [v])})
+        if member == 'filterKeys':
+            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if self._call_function(args[0], [k])})
+        if member == 'every':
+            return ('builtin', lambda args, ctx: all(self._call_function(args[0], [k, v]) for k, v in obj.items()))
+        if member == 'some':
+            return ('builtin', lambda args, ctx: any(self._call_function(args[0], [k, v]) for k, v in obj.items()))
+        if member in ('findKey', 'findValue'):
+            def _find(args, ctx):
+                for k, v in obj.items():
+                    if self._call_function(args[0], [k, v]):
+                        return k if member == 'findKey' else v
+            return ('builtin', _find)
         if member == 'toJson':
             def _to_json(args, ctx):
-                def _convert(v):
-                    if v is None:
-                        return None
-                    if isinstance(v, bool):
-                        return v
-                    if isinstance(v, (int, float, str)):
+                def _c(v):
+                    if isinstance(v, (type(None), bool, int, float, str)):
                         return v
                     if isinstance(v, list):
-                        return [_convert(i) for i in v]
+                        return [_c(i) for i in v]
                     if isinstance(v, dict):
-                        return {str(k): _convert(val) for k, val in v.items()}
+                        return {str(k): _c(val) for k, val in v.items()}
                     return str(v)
-                return json.dumps(_convert(obj))
+                return json.dumps(_c(obj))
             return ('builtin', _to_json)
-        if member == 'size':
-            return ('builtin', lambda args, ctx: len(obj))
-        if member == 'clear':
-            return ('builtin', lambda args, ctx: {})
-        if member == 'filterValues':
-            def _fv(args, ctx):
-                return {k: v for k, v in obj.items() if self._call_function(args[0], [v])}
-            return ('builtin', _fv)
-        if member == 'filterKeys':
-            def _fk(args, ctx):
-                return {k: v for k, v in obj.items() if self._call_function(args[0], [k])}
-            return ('builtin', _fk)
         if member == 'mapEntries':
             def _me(args, ctx):
-                result = {}
-                for k, v in obj.items():
-                    pair = self._call_function(args[0], [k, v])
-                    result[pair[0]] = pair[1]
-                return result
+                return {(p := self._call_function(args[0], [k, v]))[0]: p[1] for k, v in obj.items()}
             return ('builtin', _me)
         if member == 'flatMap':
-            def _flatmap(args, ctx):
-                result = []
-                for k, v in obj.items():
-                    result.extend(self._call_function(args[0], [k, v]))
-                return result
-            return ('builtin', _flatmap)
-        if member == 'toSortedArray':
-            return ('builtin', lambda args, ctx: [[k, obj[k]] for k in sorted(obj.keys())])
-        if member == 'sortByValue':
-            return ('builtin', lambda args, ctx: [[k, v] for k, v in sorted(obj.items(), key=lambda x: x[1])])
-        if member == 'toQueryString':
-            return ('builtin', lambda args, ctx: '&'.join(f"{k}={v}" for k, v in obj.items()))
+            def _fm(args, ctx):
+                return [x for k, v in obj.items() for x in self._call_function(args[0], [k, v])]
+            return ('builtin', _fm)
         if member == 'groupByValue':
             def _gbv(args, ctx):
                 groups = {}
@@ -222,8 +172,6 @@ class MemberMixin:
                     groups.setdefault(v, []).append(k)
                 return groups
             return ('builtin', _gbv)
-        if member == 'toFormattedString':
-            return ('builtin', lambda args, ctx: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
