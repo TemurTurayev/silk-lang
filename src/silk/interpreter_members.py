@@ -172,11 +172,7 @@ class MemberMixin:
         if member == 'selectKeys':
             return ('builtin', lambda args, ctx: {k: obj[k] for k in args[0] if k in obj})
         if member == 'invertGrouped':
-            def _ig(args, ctx):
-                r = {}
-                for k, v in obj.items(): r.setdefault(v, []).append(k)
-                return r
-            return ('builtin', _ig)
+            return ('builtin', lambda args, ctx: (lambda r: [r.setdefault(v, []).append(k) for k, v in obj.items()] and r or r)({}))
         if member == 'diffKeys':
             return ('builtin', lambda args, ctx: [k for k in obj if k not in args[0]])
         if member == 'commonKeys':
@@ -187,6 +183,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'countValues':
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
+        if member in ('minByValue', 'maxByValue'):
+            return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -225,6 +223,7 @@ class MemberMixin:
             'zipWith': lambda a: [self._call_function(a[1], [x, y]) for x, y in zip(obj, a[0])],
             'windows': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)],
             'splitAt': lambda a: [obj[:int(a[0])], obj[int(a[0]):]],
+            'intersperse': lambda a: [x for i, v in enumerate(obj) for x in (([a[0], v] if i > 0 else [v]))],
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -504,6 +503,7 @@ class MemberMixin:
             'charCodeAt': lambda a: ord(obj[int(a[0])]),
             'zfill': lambda a: obj.zfill(int(a[0])),
             'countWords': lambda a: obj.split().count(a[0]),
+            'isAnagram': lambda a: sorted(obj.lower().replace(' ', '')) == sorted(a[0].lower().replace(' ', '')),
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -666,6 +666,7 @@ class MemberMixin:
             'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
             'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9,
             'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
+            'sumTo': lambda: int(obj) * (int(obj) + 1) // 2,
         }
         if member in _simple:
             fn = _simple[member]
