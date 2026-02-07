@@ -206,10 +206,10 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
-        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toKotlinMap', 'toPhpArray', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
+        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toKotlinMap', 'toPhpArray', 'toRustStruct', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
             _qv = lambda v: json.dumps(v) if isinstance(v, str) else silk_repr(v)
-            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toKotlinMap': ('mapOf(', ', ', lambda k, v: f'"{k}" to {_qv(v)}'), 'toPhpArray': ('[', ', ', lambda k, v: f'"{k}" => {_qv(v)}'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
-            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toKotlinMap': ')', 'toPhpArray': ']', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
+            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toKotlinMap': ('mapOf(', ', ', lambda k, v: f'"{k}" to {_qv(v)}'), 'toPhpArray': ('[', ', ', lambda k, v: f'"{k}" => {_qv(v)}'), 'toRustStruct': ('Data { ', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
+            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toKotlinMap': ')', 'toPhpArray': ']', 'toRustStruct': ' }', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
             return ('builtin', lambda args, ctx, m=_m, cl=_cl: (m[1].join(m[2](k, v) for k, v in obj.items()) if m[0] is None else m[0] + m[1].join(m[2](k, v) for k, v in obj.items()) + cl.get(member, '')))
         if member == 'toJSONPretty':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj), indent=2))
@@ -409,10 +409,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda r: None if member == 'forEachRight' else r)([self._call_function(args[0], [x]) for x in reversed(obj)]))
         if member == 'tapEach':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in obj] and obj)
-        if member == 'filterRight':
-            return ('builtin', lambda args, ctx: [x for x in reversed(obj) if self._call_function(args[0], [x])])
-        if member == 'findRight':
-            return ('builtin', lambda args, ctx: next((x for x in reversed(obj) if self._call_function(args[0], [x])), None))
+        if member in ('filterRight', 'findRight', 'findIndexRight'):
+            return ('builtin', lambda args, ctx: [x for x in reversed(obj) if self._call_function(args[0], [x])] if member == 'filterRight' else next((x for x in reversed(obj) if self._call_function(args[0], [x])), None) if member == 'findRight' else next((i for i in range(len(obj)-1, -1, -1) if self._call_function(args[0], [obj[i]])), -1))
         if member == 'mapWhileIndexed':
             return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda v: v is not False, (self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))))
         if member in ('noneIndexed', 'everyIndexed', 'someIndexed'):
@@ -502,6 +500,7 @@ class MemberMixin:
             'toSlug': lambda: __import__('re').sub(r'-+', '-', __import__('re').sub(r'[^a-z0-9]+', '-', obj.lower())).strip('-'),
             'toSnakeCase': lambda: __import__('re').sub(r'[\s\-]+', '_', __import__('re').sub(r'([a-z])([A-Z])', r'\1_\2', obj)).lower(),
             'toCamelCase': lambda: (lambda w: w[0].lower() + ''.join(x.title() for x in w[1:]) if w else '')(__import__('re').split(r'[\s_\-]+', obj)),
+            'toKebabCase': lambda: __import__('re').sub(r'[\s_]+', '-', __import__('re').sub(r'([a-z])([A-Z])', r'\1-\2', obj)).lower(),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -695,6 +694,7 @@ class MemberMixin:
             'superFactorial': lambda: __import__('functools').reduce(lambda a, i: a * math.factorial(i), range(1, int(obj) + 1), 1),
             'subfactorial': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
             'doubleFactorial': lambda: __import__('functools').reduce(lambda a, b: a * b, range(int(obj), 0, -2), 1),
+            'primorial': lambda: __import__('functools').reduce(lambda a, b: a * b, [p for p in range(2, int(obj)+1) if all(p % i for i in range(2, int(p**0.5)+1))], 1),
         }
         if member in _simple:
             fn = _simple[member]
