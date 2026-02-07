@@ -206,6 +206,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
         if member == 'pluck':
             return ('builtin', lambda args, ctx: [obj[k] for k in args[0] if k in obj])
+        if member == 'mapToArray':
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [k, v]) for k, v in obj.items()])
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -260,6 +262,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: fn(args))
         if member == 'slice':
             return ('builtin', lambda args, ctx: obj[int(args[0]):int(args[1])])
+        if member == 'zip3':
+            return ('builtin', lambda args, ctx: [[x, y, z] for x, y, z in zip(obj, args[0], args[1])])
         if member == 'indexOf':
             return ('builtin', lambda args, ctx: obj.index(args[0]) if args[0] in obj else -1)
         if member == 'map':
@@ -307,11 +311,7 @@ class MemberMixin:
         if member == 'rotate':
             return ('builtin', lambda args, ctx: (lambda n: obj[-n:] + obj[:-n] if n else list(obj))(int(args[0]) % len(obj)) if obj else [])
         if member == 'partition':
-            def _part(args, ctx):
-                y, n = [], []
-                for x in obj: (y if self._call_function(args[0], [x]) else n).append(x)
-                return [y, n]
-            return ('builtin', _part)
+            return ('builtin', lambda args, ctx: (lambda y, n: [(y if self._call_function(args[0], [x]) else n).append(x) for x in obj] and [y, n] or [y, n])([], []))
         if member == 'findLast':
             return ('builtin', lambda args, ctx: next((x for x in reversed(obj) if self._call_function(args[0], [x])), None))
         if member == 'findLastIndex':
@@ -371,11 +371,7 @@ class MemberMixin:
         if member == 'at':
             return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
         if member == 'associate':
-            def _assoc(args, ctx):
-                r = {}
-                for x in obj: p = self._call_function(args[0], [x]); r[p[0]] = p[1]
-                return r
-            return ('builtin', _assoc)
+            return ('builtin', lambda args, ctx: {(p := self._call_function(args[0], [x]))[0]: p[1] for x in obj})
         if member == 'interpose':
             def _ip(args, ctx):
                 if len(obj) <= 1: return list(obj)
@@ -527,7 +523,7 @@ class MemberMixin:
             'replaceFirst': lambda a: obj.replace(a[0], a[1], 1),
             'padStart': lambda a: obj.rjust(int(a[0]), a[1]),
             'padEnd': lambda a: obj.ljust(int(a[0]), a[1]),
-            'center': lambda a: obj.center(int(a[0]), a[1]),
+            'center': lambda a: obj.center(int(a[0]), a[1]), 'centerPad': lambda a: obj.center(int(a[0]), a[1]),
             'wrap': lambda a: a[0] + obj + a[1],
             'mask': lambda a: a[0] * (len(obj) - int(a[1])) + obj[-int(a[1]):] if len(obj) > int(a[1]) else obj,
             'padCenter': lambda a: obj.center(int(a[0]), a[1]),
@@ -677,6 +673,7 @@ class MemberMixin:
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
             'isPowerOfTwo': lambda: int(obj) > 0 and (int(obj) & (int(obj) - 1)) == 0,
             'sumOfSquares': lambda: sum(i * i for i in range(1, int(obj) + 1)),
+            'isNarcissistic': lambda: (lambda s, n: sum(int(d) ** n for d in s) == int(obj))(str(abs(int(obj))), len(str(abs(int(obj))))),
         }
         if member in _simple:
             fn = _simple[member]
