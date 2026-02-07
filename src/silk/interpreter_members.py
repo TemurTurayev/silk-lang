@@ -202,6 +202,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {**args[0], **obj})
         if member == 'keyOf':
             return ('builtin', lambda args, ctx: next((k for k, v in obj.items() if v == args[0]), None))
+        if member == 'pluck':
+            return ('builtin', lambda args, ctx: [obj[k] for k in args[0] if k in obj])
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -248,6 +250,7 @@ class MemberMixin:
             'splitAt': lambda a: [obj[:int(a[0])], obj[int(a[0]):]],
             'cycle': lambda a: obj * int(a[0]),
             'takeRight': lambda a: obj[-int(a[0]):] if int(a[0]) > 0 else [],
+            'dropRight': lambda a: obj[:-int(a[0])] if int(a[0]) > 0 else list(obj),
             'intersperse': lambda a: [x for i, v in enumerate(obj) for x in (([a[0], v] if i > 0 else [v]))],
         }
         if member in _onearg:
@@ -256,12 +259,7 @@ class MemberMixin:
         if member == 'slice':
             return ('builtin', lambda args, ctx: obj[int(args[0]):int(args[1])])
         if member == 'indexOf':
-            def _index_of(args, ctx):
-                try:
-                    return obj.index(args[0])
-                except ValueError:
-                    return -1
-            return ('builtin', _index_of)
+            return ('builtin', lambda args, ctx: obj.index(args[0]) if args[0] in obj else -1)
         if member == 'map':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [item]) for item in obj])
         if member == 'filter':
@@ -519,6 +517,7 @@ class MemberMixin:
             'zfill': lambda a: obj.zfill(int(a[0])),
             'countWords': lambda a: obj.split().count(a[0]),
             'isAnagram': lambda a: sorted(obj.lower().replace(' ', '')) == sorted(a[0].lower().replace(' ', '')),
+            'indent': lambda a: '\n'.join(' ' * int(a[0]) + l for l in obj.split('\n')),
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -678,6 +677,7 @@ class MemberMixin:
             'isKaprekar': lambda: (lambda n, sq: any(int(str(sq)[:i]) + int(str(sq)[i:]) == n for i in range(1, len(str(sq)))) if n > 0 else False)(int(obj), int(obj) ** 2),
             'cubeRoot': lambda: (lambda r: int(r) if r == int(r) else r)(round(obj ** (1/3), 10)),
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
+            'isPowerOfTwo': lambda: int(obj) > 0 and (int(obj) & (int(obj) - 1)) == 0,
         }
         if member in _simple:
             fn = _simple[member]
