@@ -180,6 +180,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [v for k, v in obj.items() if self._call_function(args[0], [k, v])])
         if member in ('toSortedKeys', 'sortByKey'):
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
+        if member == 'toSortedValues':
+            return ('builtin', lambda args, ctx: sorted(obj.values()))
         if member == 'countValues':
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
         if member == 'paths':
@@ -242,7 +244,7 @@ class MemberMixin:
             'contains': lambda a: a[0] in obj,
             'join': lambda a: a[0].join(silk_repr(item) for item in obj),
             'take': lambda a: obj[:int(a[0])], 'head': lambda a: obj[:int(a[0])],
-            'skip': lambda a: obj[int(a[0]):],
+            'skip': lambda a: obj[int(a[0]):], 'dropFirst': lambda a: obj[int(a[0]):],
             'tail': lambda a: obj[-int(a[0]):] if int(a[0]) <= len(obj) else list(obj),
             'without': lambda a: [x for x in obj if x not in a[0]],
             'difference': lambda a: [x for x in obj if x not in a[0]],
@@ -523,6 +525,7 @@ class MemberMixin:
             'wrap': lambda a: a[0] + obj + a[1],
             'mask': lambda a: a[0] * (len(obj) - int(a[1])) + obj[-int(a[1]):] if len(obj) > int(a[1]) else obj,
             'padCenter': lambda a: obj.center(int(a[0]), a[1]),
+            'wrapEach': lambda a: ''.join(a[0] + c + a[1] for c in obj),
         }
         if member in _twoarg:
             fn = _twoarg[member]
@@ -672,6 +675,7 @@ class MemberMixin:
             'isPowerOfTwo': lambda: int(obj) > 0 and (int(obj) & (int(obj) - 1)) == 0,
             'sumOfSquares': lambda: sum(i * i for i in range(1, int(obj) + 1)),
             'isNarcissistic': lambda: (lambda s, n: sum(int(d) ** n for d in s) == int(obj))(str(abs(int(obj))), len(str(abs(int(obj))))),
+            'isSquare': lambda: int(obj) >= 0 and int(obj ** 0.5) ** 2 == int(obj),
         }
         if member in _simple:
             fn = _simple[member]
