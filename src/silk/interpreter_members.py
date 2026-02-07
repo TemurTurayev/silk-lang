@@ -75,15 +75,10 @@ class MemberMixin:
         if member in obj.fields:
             return obj.fields[member]
         if env is not None:
-            struct_info = env.get(obj.struct_name)
-            if (isinstance(struct_info, tuple)
-                    and struct_info[0] == 'struct_def'):
-                _, _, _, methods = struct_info
-                if member in methods:
-                    return ('bound_method', methods[member], obj)
-        raise RuntimeError_(
-            f"Struct '{obj.struct_name}' has no field or method '{member}'"
-        )
+            si = env.get(obj.struct_name)
+            if isinstance(si, tuple) and si[0] == 'struct_def' and member in si[3]:
+                return ('bound_method', si[3][member], obj)
+        raise RuntimeError_(f"Struct '{obj.struct_name}' has no field or method '{member}'")
 
     def _eval_dict_member(self, obj: dict, member: str) -> Any:
         """Evaluate member access on a dict."""
@@ -211,6 +206,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toSwiftDict':
+            return ('builtin', lambda args, ctx: '[' + ', '.join(f'"{k}": {silk_repr(v)}' for k, v in obj.items()) + ']')
         if member == 'toPythonDict':
             return ('builtin', lambda args, ctx: '{' + ', '.join(f'"{k}": {silk_repr(v)}' for k, v in obj.items()) + '}')
         if member == 'toRubyHash':
@@ -413,6 +410,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'noneIndexed':
+            return ('builtin', lambda args, ctx: not any(self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))
         if member == 'everyIndexed':
             return ('builtin', lambda args, ctx: all(self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))
         if member == 'someIndexed':
@@ -464,7 +463,7 @@ class MemberMixin:
             'rot13': lambda: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + 13) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj),
             'isPalindrome': lambda: obj == obj[::-1],
             'wordCount': lambda: len(obj.split()) if obj.strip() else 0,
-            'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'codePoints': lambda: [ord(c) for c in obj],
+            'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'codePoints': lambda: [ord(c) for c in obj], 'toCharCodes': lambda: [ord(c) for c in obj],
             'isHexColor': lambda: bool(__import__('re').match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', obj)),
             'normalize': lambda: ' '.join(obj.split()),
             'isIPv4': lambda: len(p := obj.split('.')) == 4 and all(s.isdigit() and 0 <= int(s) <= 255 for s in p),
@@ -605,11 +604,9 @@ class MemberMixin:
                 except: return False
             return ('builtin', _ij)
         if member in ('encodeBase64', 'decodeBase64'):
-            import base64 as _b64
-            return ('builtin', lambda args, ctx: (_b64.b64encode if member == 'encodeBase64' else _b64.b64decode)(obj.encode()).decode())
+            return ('builtin', lambda args, ctx: (__import__('base64').b64encode if member == 'encodeBase64' else __import__('base64').b64decode)(obj.encode()).decode())
         if member == 'matchCount':
-            import re as _re
-            return ('builtin', lambda args, ctx: len(_re.findall(args[0], obj)))
+            return ('builtin', lambda args, ctx: len(__import__('re').findall(args[0], obj)))
         if member == 'extractNumbers':
             return ('builtin', lambda args, ctx: [int(n) if n.isdigit() else float(n) for n in __import__('re').findall(r'-?\d+\.?\d*', obj)])
         if member == 'extractEmails':
@@ -704,6 +701,7 @@ class MemberMixin:
             'sumOfDigitsPower': lambda a: sum(int(d) ** int(a[0]) for d in str(abs(int(obj)))),
             'stirling': lambda a: (lambda n, k: sum((-1)**(k-j) * math.comb(k, j) * j**n for j in range(k+1)) // math.factorial(k))(int(obj), int(a[0])),
             'centered': lambda a: int(a[0]) * int(obj) * (int(obj) - 1) // 2 + 1,
+            'polygonal': lambda a: int(obj) * ((int(a[0]) - 2) * int(obj) - (int(a[0]) - 4)) // 2,
         }
         if member in _onearg:
             fn = _onearg[member]
