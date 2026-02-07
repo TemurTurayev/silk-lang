@@ -174,6 +174,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'toSortedValues':
             return ('builtin', lambda args, ctx: sorted(obj.values()))
+        if member == 'symmetricDifference':
+            return ('builtin', lambda args, ctx: {**{k: v for k, v in obj.items() if k not in args[0]}, **{k: v for k, v in args[0].items() if k not in obj}})
         if member in ('countValues', 'valueCounts'):
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
         if member == 'paths':
@@ -370,6 +372,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {(p := self._call_function(args[0], [x]))[0]: p[1] for x in obj})
         if member == 'interpose':
             return ('builtin', lambda args, ctx: [x for i, v in enumerate(obj) for x in ([args[0], v] if i > 0 else [v])])
+        if member == 'juxtapose':
+            return ('builtin', lambda args, ctx: [[self._call_function(fn, [x]) for fn in args[0]] for x in obj])
         if member == 'crossProduct':
             return ('builtin', lambda args, ctx: [[a, b] for a in obj for b in args[0]])
         if member == 'transpose':
@@ -379,20 +383,11 @@ class MemberMixin:
         if member == 'permutations':
             return ('builtin', lambda args, ctx: [list(p) for p in __import__('itertools').permutations(obj)])
         if member == 'median':
-            def _med(args, ctx):
-                s, n = sorted(obj), len(obj)
-                if n % 2 == 1: return s[n // 2]
-                mid = s[n // 2 - 1] + s[n // 2]
-                return mid / 2 if mid % 2 else mid // 2
-            return ('builtin', _med)
+            return ('builtin', lambda args, ctx: (lambda s, n: s[n//2] if n % 2 else (lambda m: m/2 if m % 2 else m//2)(s[n//2-1]+s[n//2]))(sorted(obj), len(obj)))
         if member == 'mode':
             return ('builtin', lambda args, ctx: (lambda c: [k for k, v in c.items() if v == max(c.values())])((lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({})))
         if member in ('stddev', 'variance'):
-            def _sv(args, ctx):
-                v = sum((x - sum(obj) / len(obj)) ** 2 for x in obj) / len(obj)
-                r = v ** 0.5 if member == 'stddev' else v
-                return int(r) if r == int(r) else r
-            return ('builtin', _sv)
+            return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)((lambda v: v ** 0.5 if member == 'stddev' else v)(sum((x - sum(obj)/len(obj)) ** 2 for x in obj) / len(obj))))
         if member in ('chunkBy', 'partitionBy'):
             def _cb(args, ctx):
                 if not obj: return []
@@ -542,11 +537,11 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: __import__('re').sub(r' {2,}', ' ', obj))
         if member == 'at':
             return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
-        if member in ('camelCase', 'snakeCase', 'kebabCase', 'titleCase'):
+        if member in ('camelCase', 'snakeCase', 'kebabCase', 'titleCase', 'toPascalCase'):
             def _cc(args, ctx, _re=__import__('re')):
                 p = _re.split(r'[-_\s]+', obj)
                 if member == 'camelCase': return p[0].lower() + ''.join(w.capitalize() for w in p[1:])
-                if member == 'titleCase': return ' '.join(w.capitalize() for w in p)
+                if member in ('titleCase', 'toPascalCase'): return (' ' if member == 'titleCase' else '').join(w.capitalize() for w in p)
                 sep = '_' if member == 'snakeCase' else '-'
                 return _re.sub(r'([a-z])([A-Z])', r'\1' + sep + r'\2', _re.sub(r'[-_\s]+', sep, obj)).lower()
             return ('builtin', _cc)
@@ -689,6 +684,7 @@ class MemberMixin:
             'isCoprime': lambda a: math.gcd(int(obj), int(a[0])) == 1,
             'toBinaryArray': lambda a: [int(b) for b in bin(int(obj))[2:].zfill(int(a[0]))],
             'nthRoot': lambda a: (lambda r: int(r) if r == int(r) else r)(round(obj ** (1/a[0]), 10)),
+            'isLychrel': lambda a: (f := lambda n, i: True if i <= 0 else (lambda r: False if str(r) == str(r)[::-1] else f(r, i-1))(n + int(str(n)[::-1])))(int(obj), int(a[0])),
         }
         if member in _onearg:
             fn = _onearg[member]
