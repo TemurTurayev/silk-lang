@@ -122,9 +122,7 @@ class MemberMixin:
         if member == 'get':
             return ('builtin', lambda args, ctx: obj.get(args[0], args[1] if len(args) > 1 else None))
         if member == 'forEach':
-            def _fe(args, ctx):
-                for k, v in obj.items(): self._call_function(args[0], [k, v])
-            return ('builtin', _fe)
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [k, v]) for k, v in obj.items()] and None)
         if member in ('filter', 'reject'):
             return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if (not self._call_function(args[0], [k, v]) if member == 'reject' else self._call_function(args[0], [k, v]))})
         if member == 'map':
@@ -140,11 +138,7 @@ class MemberMixin:
         if member in ('every', 'some'):
             return ('builtin', lambda args, ctx: (all if member == 'every' else any)(self._call_function(args[0], [k, v]) for k, v in obj.items()))
         if member in ('findKey', 'findValue'):
-            def _find(args, ctx):
-                for k, v in obj.items():
-                    if self._call_function(args[0], [k, v]):
-                        return k if member == 'findKey' else v
-            return ('builtin', _find)
+            return ('builtin', lambda args, ctx: next(((k if member == 'findKey' else v) for k, v in obj.items() if self._call_function(args[0], [k, v])), None))
         if member == 'toJson':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj)))
         if member == 'mapEntries':
@@ -217,6 +211,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toPythonDict':
+            return ('builtin', lambda args, ctx: '{' + ', '.join(f'"{k}": {silk_repr(v)}' for k, v in obj.items()) + '}')
         if member == 'toRubyHash':
             return ('builtin', lambda args, ctx: '{' + ', '.join(f'"{k}" => {silk_repr(v)}' for k, v in obj.items()) + '}')
         if member == 'toLuaTable':
@@ -417,6 +413,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'everyIndexed':
+            return ('builtin', lambda args, ctx: all(self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))
         if member == 'someIndexed':
             return ('builtin', lambda args, ctx: any(self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))
         if member == 'flatMapIndexed':
@@ -496,6 +494,7 @@ class MemberMixin:
             'removeVowels': lambda: ''.join(c for c in obj if c.lower() not in 'aeiou'),
             'removeConsonants': lambda: ''.join(c for c in obj if not c.isalpha() or c.lower() in 'aeiou'),
             'toCamelWords': lambda: __import__('re').sub(r'([a-z])([A-Z])', r'\1_\2', obj).split('_'),
+            'toWordArray': lambda: obj.split(),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -704,6 +703,7 @@ class MemberMixin:
             'isLychrel': lambda a: (f := lambda n, i: True if i <= 0 else (lambda r: False if str(r) == str(r)[::-1] else f(r, i-1))(n + int(str(n)[::-1])))(int(obj), int(a[0])),
             'sumOfDigitsPower': lambda a: sum(int(d) ** int(a[0]) for d in str(abs(int(obj)))),
             'stirling': lambda a: (lambda n, k: sum((-1)**(k-j) * math.comb(k, j) * j**n for j in range(k+1)) // math.factorial(k))(int(obj), int(a[0])),
+            'centered': lambda a: int(a[0]) * int(obj) * (int(obj) - 1) // 2 + 1,
         }
         if member in _onearg:
             fn = _onearg[member]
