@@ -1,5 +1,5 @@
 """
-Tests for number .lucasNumber() method.
+Tests for number .lucas() method - Lucas number at index n.
 """
 
 from silk.interpreter import Interpreter
@@ -12,14 +12,10 @@ class TestNumberLucas:
         interp.run(source)
         return interp.output_lines
 
-    def test_lucasNumber_0(self):
-        output = self._run('print(0.lucasNumber())')
-        assert output[-1] == "2"
-
-    def test_lucasNumber_1(self):
-        output = self._run('print(1.lucasNumber())')
-        assert output[-1] == "1"
-
-    def test_lucasNumber_5(self):
-        output = self._run('print(5.lucasNumber())')
+    def test_lucas_5(self):
+        output = self._run('print(5.lucas())')
         assert output[-1] == "11"
+
+    def test_lucas_0(self):
+        output = self._run('print(0.lucas())')
+        assert output[-1] == "2"
