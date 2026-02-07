@@ -148,13 +148,9 @@ class MemberMixin:
         if member == 'toJson':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj)))
         if member == 'mapEntries':
-            def _me(args, ctx):
-                return {(p := self._call_function(args[0], [k, v]))[0]: p[1] for k, v in obj.items()}
-            return ('builtin', _me)
+            return ('builtin', lambda args, ctx: {(p := self._call_function(args[0], [k, v]))[0]: p[1] for k, v in obj.items()})
         if member == 'flatMap':
-            def _fm(args, ctx):
-                return [x for k, v in obj.items() for x in self._call_function(args[0], [k, v])]
-            return ('builtin', _fm)
+            return ('builtin', lambda args, ctx: [x for k, v in obj.items() for x in self._call_function(args[0], [k, v])])
         if member == 'groupByValue':
             return ('builtin', lambda args, ctx: (lambda g: [g.setdefault(v, []).append(k) for k, v in obj.items()] and g or g)({}))
         if member == 'deepMerge':
@@ -221,6 +217,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toLuaTable':
+            return ('builtin', lambda args, ctx: '{' + ', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items()) + '}')
         if member == 'toJSONPretty':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj), indent=2))
         if member == 'toHTMLList':
@@ -318,9 +316,7 @@ class MemberMixin:
         if member == 'flattenDeep':
             return ('builtin', lambda args, ctx: (f := lambda a: [x for i in a for x in (f(i) if isinstance(i, list) else [i])])(obj))
         if member == 'flatMap':
-            def _fm(args, ctx):
-                return [y for x in obj for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [x]))]
-            return ('builtin', _fm)
+            return ('builtin', lambda args, ctx: [y for x in obj for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [x]))])
         if member == 'unique':
             return ('builtin', lambda args, ctx: list(dict.fromkeys(obj)))
         if member == 'count':
@@ -419,6 +415,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'flatMapIndexed':
+            return ('builtin', lambda args, ctx: [y for i, x in enumerate(obj) for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [i, x]))])
         if member == 'reduceIndexed':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, ix: self._call_function(args[0], [acc, ix[0], ix[1]]), enumerate(obj), args[1]))
         if member == 'filterIndexed':
@@ -492,6 +490,7 @@ class MemberMixin:
             'isKebabCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9\-]*$', obj)) and '--' not in obj,
             'squeezeBlanks': lambda: __import__('re').sub(r'\n{3,}', '\n\n', obj),
             'removeVowels': lambda: ''.join(c for c in obj if c.lower() not in 'aeiou'),
+            'removeConsonants': lambda: ''.join(c for c in obj if not c.isalpha() or c.lower() in 'aeiou'),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -683,6 +682,7 @@ class MemberMixin:
             'bell': lambda: __import__('functools').reduce(lambda r, _: (s := [r[-1]]) and [s.append(s[-1]+v) for v in r] and s, range(int(obj)), [1])[0],
             'derangements': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
             'motzkin': lambda: __import__('functools').reduce(lambda ab, i: (ab[1], ((2*i+1)*ab[1] + 3*(i-1)*ab[0]) // (i+2)), range(1, int(obj)+1), (1, 1))[1] if int(obj) > 0 else 1,
+            'tetrahedral': lambda: int(obj) * (int(obj) + 1) * (int(obj) + 2) // 6,
         }
         if member in _simple:
             fn = _simple[member]
