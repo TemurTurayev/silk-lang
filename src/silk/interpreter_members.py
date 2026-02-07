@@ -162,8 +162,7 @@ class MemberMixin:
             def _dm(args, ctx):
                 def _m(a, b):
                     r = dict(a)
-                    for k, v in b.items():
-                        r[k] = _m(r[k], v) if k in r and isinstance(r[k], dict) and isinstance(v, dict) else v
+                    for k, v in b.items(): r[k] = _m(r[k], v) if k in r and isinstance(r[k], dict) and isinstance(v, dict) else v
                     return r
                 return _m(obj, args[0])
             return ('builtin', _dm)
@@ -183,6 +182,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'countValues':
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
+        if member == 'paths':
+            def _ps(args, ctx):
+                def _p(d, pfx=''):
+                    return [y for k, v in d.items() for y in (_p(v, f"{pfx}.{k}" if pfx else k) if isinstance(v, dict) else [f"{pfx}.{k}" if pfx else k])]
+                return _p(obj)
+            return ('builtin', _ps)
         if member == 'keysByValue':
             return ('builtin', lambda args, ctx: [k for k, v in obj.items() if v == args[0]])
         if member == 'valueSet':
@@ -278,11 +283,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [x for i in obj for x in (i if isinstance(i, list) else [i])])
         if member == 'flatMap':
             def _fm(args, ctx):
-                r = []
-                for x in obj:
-                    m = self._call_function(args[0], [x])
-                    r.extend(m if isinstance(m, list) else [m])
-                return r
+                return [y for x in obj for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [x]))]
             return ('builtin', _fm)
         if member == 'unique':
             def _u(args, ctx):
@@ -427,7 +428,7 @@ class MemberMixin:
                 for x in obj[1:]:
                     k = self._call_function(args[0], [x])
                     if k == p: g.append(x)
-                    else: r.append(g); g, p = [x], k
+                    else: r.append(g); g = [x]; p = k
                 return r + [g]
             return ('builtin', _cb)
         if member == 'sliding':
@@ -456,6 +457,8 @@ class MemberMixin:
                     else: r.append(g); g = [x]
                 return r + [g]
             return ('builtin', _gc)
+        if member in ('mapFirst', 'mapLast'):
+            return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
         if member == 'foldRight':
@@ -580,8 +583,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: list(obj.partition(args[0])))
         if member in ('commonPrefix', 'commonSuffix'):
             def _cp(args, ctx):
-                o, i = args[0], 0
-                a, b = (obj, o) if member == 'commonPrefix' else (obj[::-1], o[::-1])
+                o, a, b = args[0], *((obj, args[0]) if member == 'commonPrefix' else (obj[::-1], args[0][::-1])),
+                i = 0
                 while i < len(a) and i < len(b) and a[i] == b[i]: i += 1
                 return obj[:i] if member == 'commonPrefix' else (obj[len(obj)-i:] if i else '')
             return ('builtin', _cp)
@@ -605,7 +608,7 @@ class MemberMixin:
                 for ch in obj[1:]:
                     cd = _c.get(ch.upper(), 0)
                     if cd > 0 and cd != p: r += str(cd)
-                    p = cd if cd > 0 else p
+                    p = cd or p
                 return (r + '000')[:4]
             return ('builtin', _sx)
         if member == 'isUrl':
@@ -633,6 +636,8 @@ class MemberMixin:
         if member == 'matchCount':
             import re as _re
             return ('builtin', lambda args, ctx: len(_re.findall(args[0], obj)))
+        if member == 'extractNumbers':
+            return ('builtin', lambda args, ctx: [int(n) if n.isdigit() else float(n) for n in __import__('re').findall(r'-?\d+\.?\d*', obj)])
         if member == 'wordFrequency':
             return ('builtin', lambda args, ctx: (lambda f: [f.update({w: f.get(w, 0) + 1}) for w in obj.split()] and f or f)({}) if obj.strip() else {})
         if member == 'isBalanced':
@@ -640,22 +645,18 @@ class MemberMixin:
                 s = []
                 for c in obj:
                     if c in '([{': s.append(c)
-                    elif c in ')]}' and (not s or s.pop() != _m[c]): return False
+                    elif c in _m and (not s or s.pop() != _m[c]): return False
                 return not s
             return ('builtin', _ib)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
         """Evaluate member access on a number."""
-        def _to_base(n, base):
-            if n == 0:
-                return '0'
-            digits, neg = '0123456789abcdefghijklmnopqrstuvwxyz', n < 0
-            n, result = abs(n), []
-            while n:
-                result.append(digits[n % base])
-                n //= base
-            return ('-' if neg else '') + ''.join(reversed(result))
+        def _to_base(n, base, _d='0123456789abcdefghijklmnopqrstuvwxyz'):
+            if n == 0: return '0'
+            neg, n, r = n < 0, abs(n), []
+            while n: r.append(_d[n % base]); n //= base
+            return ('-' if neg else '') + ''.join(reversed(r))
         _simple = {
             'abs': lambda: abs(obj), 'floor': lambda: math.floor(obj),
             'ceil': lambda: math.ceil(obj), 'round': lambda: round(obj),
@@ -674,6 +675,7 @@ class MemberMixin:
             'sumTo': lambda: int(obj) * (int(obj) + 1) // 2,
             'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
             'isAutomorphic': lambda: str(int(obj) ** 2).endswith(str(int(obj))),
+            'toBits': lambda: [int(b) for b in bin(int(obj))[2:]],
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
         }
         if member in _simple:
@@ -720,12 +722,9 @@ class MemberMixin:
                 return a
             return ('builtin', _fib)
         if member == 'toWords':
-            def _tw(args, ctx):
+            def _tw(args, ctx, _o=['','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'], _t=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']):
                 n = int(obj)
                 if n == 0: return 'zero'
-                _o = ['','one','two','three','four','five','six','seven','eight','nine','ten',
-                      'eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen']
-                _t = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']
                 def _ch(num):
                     if num == 0: return ''
                     if num < 20: return _o[num]
