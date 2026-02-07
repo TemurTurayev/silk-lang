@@ -214,8 +214,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
         if member in ('toXML', 'toYAML', 'toINI'):
             return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{k}{'=' if member == 'toINI' else ': '}{silk_repr(v)}" for k, v in obj.items()))
-        if member == 'toDotNotation':
-            return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
+        if member in ('toDotNotation', 'fromDotNotation'):
+            if member == 'toDotNotation':
+                return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
+            return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -242,6 +244,7 @@ class MemberMixin:
             'unzip': lambda: [list(t) for t in zip(*obj)] if obj else [],
             'maxIndex': lambda: obj.index(max(obj)), 'minIndex': lambda: obj.index(min(obj)),
             'accumulate': lambda: list(__import__('itertools').accumulate(obj)),
+            'adjacentDiff': lambda: [obj[i+1] - obj[i] for i in range(len(obj) - 1)],
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -460,6 +463,7 @@ class MemberMixin:
             'toHashCode': lambda: hash(obj),
             'isDate': lambda: bool(__import__('re').match(r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$', obj)),
             'toSentenceCase': lambda: obj[0].upper() + obj[1:].lower() if obj else '',
+            'isPhoneNumber': lambda: bool(__import__('re').match(r'^[\+]?[\d\s\-\(\)]{7,}$', obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -555,12 +559,7 @@ class MemberMixin:
             def _lev(args, ctx):
                 o, m, n = args[0], len(obj), len(args[0])
                 if not m or not n: return m or n
-                p = list(range(n + 1))
-                for i in range(1, m + 1):
-                    c = [i] + [0]*n
-                    for j in range(1, n+1): c[j] = min(c[j-1]+1, p[j]+1, p[j-1]+(obj[i-1]!=o[j-1]))
-                    p = c
-                return p[n]
+                return __import__('functools').reduce(lambda p, i: (c := [i+1]+[0]*n) and [c.__setitem__(j, min(c[j-1]+1, p[j]+1, p[j-1]+(obj[i]!=o[j-1]))) for j in range(1, n+1)] and c, range(m), list(range(n+1)))[n]
             return ('builtin', _lev)
         if member == 'hamming':
             return ('builtin', lambda args, ctx: sum(a != b for a, b in zip(obj, args[0])))
@@ -736,11 +735,11 @@ class MemberMixin:
                     rem //= 1000; i += 1
                 return ('negative ' if n < 0 else '') + ' '.join(reversed(p))
             return ('builtin', _tw)
-        if member == 'collatz':
+        if member in ('collatz', 'collatzSequence'):
             def _cz(args, ctx):
-                n, s = int(obj), 0
-                while n != 1: n, s = (n // 2 if n % 2 == 0 else 3 * n + 1), s + 1
-                return s
+                n, r = int(obj), [int(obj)]
+                while n != 1: n = n // 2 if n % 2 == 0 else 3 * n + 1; r.append(n)
+                return r if member == 'collatzSequence' else len(r) - 1
             return ('builtin', _cz)
         if member == 'nthPrime':
             def _np(args, ctx):
