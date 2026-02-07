@@ -88,13 +88,10 @@ class MemberMixin:
             'keys': lambda: list(obj.keys()), 'values': lambda: list(obj.values()),
             'isEmpty': lambda: len(obj) == 0, 'clear': lambda: {},
             'invert': lambda: {v: k for k, v in obj.items()},
-            'toSortedArray': lambda: [[k, obj[k]] for k in sorted(obj.keys())],
-            'sortByValue': lambda: [[k, v] for k, v in sorted(obj.items(), key=lambda x: x[1])],
-            'toQueryString': lambda: '&'.join(f"{k}={v}" for k, v in obj.items()),
-            'toFormattedString': lambda: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
+            'toSortedArray': lambda: [[k, obj[k]] for k in sorted(obj.keys())], 'sortByValue': lambda: [[k, v] for k, v in sorted(obj.items(), key=lambda x: x[1])],
+            'toQueryString': lambda: '&'.join(f"{k}={v}" for k, v in obj.items()), 'toFormattedString': lambda: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
             'toHeaderString': lambda: '\n'.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
-            'sumValues': lambda: sum(obj.values()),
-            'maxValue': lambda: max(obj.values()), 'minValue': lambda: min(obj.values()),
+            'sumValues': lambda: sum(obj.values()), 'maxValue': lambda: max(obj.values()), 'minValue': lambda: min(obj.values()),
             'averageValue': lambda: (lambda r: int(r) if r == int(r) else r)(sum(obj.values()) / len(obj)),
             'toProperties': lambda: '\n'.join(f"{k}={silk_repr(v)}" for k, v in obj.items()),
         }
@@ -206,10 +203,10 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
-        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toKotlinMap', 'toPhpArray', 'toRustStruct', 'toCSharpDict', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
+        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toKotlinMap', 'toPhpArray', 'toRustStruct', 'toCSharpDict', 'toClojureMap', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
             _qv = lambda v: json.dumps(v) if isinstance(v, str) else silk_repr(v)
-            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toKotlinMap': ('mapOf(', ', ', lambda k, v: f'"{k}" to {_qv(v)}'), 'toPhpArray': ('[', ', ', lambda k, v: f'"{k}" => {_qv(v)}'), 'toRustStruct': ('Data { ', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toCSharpDict': ('{', ', ', lambda k, v: f'{{"{k}", {_qv(v)}}}'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
-            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toKotlinMap': ')', 'toPhpArray': ']', 'toRustStruct': ' }', 'toCSharpDict': '}', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
+            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toKotlinMap': ('mapOf(', ', ', lambda k, v: f'"{k}" to {_qv(v)}'), 'toPhpArray': ('[', ', ', lambda k, v: f'"{k}" => {_qv(v)}'), 'toRustStruct': ('Data { ', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toCSharpDict': ('{', ', ', lambda k, v: f'{{"{k}", {_qv(v)}}}'), 'toClojureMap': ('{', ', ', lambda k, v: f':{k} {_qv(v)}'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
+            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toKotlinMap': ')', 'toPhpArray': ']', 'toRustStruct': ' }', 'toCSharpDict': '}', 'toClojureMap': '}', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
             return ('builtin', lambda args, ctx, m=_m, cl=_cl: (m[1].join(m[2](k, v) for k, v in obj.items()) if m[0] is None else m[0] + m[1].join(m[2](k, v) for k, v in obj.items()) + cl.get(member, '')))
         if member == 'toJSONPretty':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj), indent=2))
@@ -436,6 +433,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)(sum(v*w for v, w in zip(obj, args[0])) / sum(args[0])))
         if member in ('foldRight', 'reduceRight'):
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, x: self._call_function(args[0], [acc, x]), reversed(obj), args[1]))
+        if member == 'reduceWhile':
+            return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [((s.__setitem__(0, r) or True) if (r := self._call_function(args[1], [s[0], x])) is not False else None) for x in obj] and s[0])())
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -500,6 +499,7 @@ class MemberMixin:
             'toCamelCase': lambda: (lambda w: w[0].lower() + ''.join(x.title() for x in w[1:]) if w else '')(__import__('re').split(r'[\s_\-]+', obj)),
             'toKebabCase': lambda: __import__('re').sub(r'[\s_]+', '-', __import__('re').sub(r'([a-z])([A-Z])', r'\1-\2', obj)).lower(),
             'toBase64': lambda: __import__('base64').b64encode(obj.encode()).decode(),
+            'fromBase64': lambda: __import__('base64').b64decode(obj.encode()).decode(),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -694,7 +694,7 @@ class MemberMixin:
             'subfactorial': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
             'doubleFactorial': lambda: __import__('functools').reduce(lambda a, b: a * b, range(int(obj), 0, -2), 1),
             'primorial': lambda: __import__('functools').reduce(lambda a, b: a * b, [p for p in range(2, int(obj)+1) if all(p % i for i in range(2, int(p**0.5)+1))], 1),
-            'lucas': lambda: (lambda: (a := [2, 1]) and [a.append(a[-1]+a[-2]) for _ in range(int(obj)-1)] and a[int(obj)])() if int(obj) > 1 else [2, 1][int(obj)],
+            'abundance': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj),
         }
         if member in _simple:
             fn = _simple[member]
@@ -733,14 +733,15 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: int(obj) >= 2 and all(int(obj) % i for i in range(2, int(int(obj)**0.5) + 1)))
         if member == 'toRoman':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda nr, vs: (nr[0] % vs[0], nr[1] + vs[1] * (nr[0] // vs[0])), [(1000,'M'),(900,'CM'),(500,'D'),(400,'CD'),(100,'C'),(90,'XC'),(50,'L'),(40,'XL'),(10,'X'),(9,'IX'),(5,'V'),(4,'IV'),(1,'I')], (int(obj), ''))[1])
-        if member in ('fibonacci', 'lucasNumber', 'tribonacci', 'jacobsthal', 'pell'):
+        if member in ('fibonacci', 'lucasNumber', 'lucas', 'tribonacci', 'jacobsthal', 'pell'):
             def _fib(args, ctx):
-                if member == 'tribonacci':
+                _m = 'lucasNumber' if member == 'lucas' else member
+                if _m == 'tribonacci':
                     a, b, c = 0, 1, 1
                     for _ in range(int(obj)): a, b, c = b, c, a + b + c
                     return a
-                a, b = {'fibonacci': (0, 1), 'lucasNumber': (2, 1), 'jacobsthal': (0, 1), 'pell': (0, 1)}[member]
-                for _ in range(int(obj)): a, b = b, ({'jacobsthal': b + 2*a, 'pell': 2*b + a}.get(member, a + b))
+                a, b = {'fibonacci': (0, 1), 'lucasNumber': (2, 1), 'jacobsthal': (0, 1), 'pell': (0, 1)}[_m]
+                for _ in range(int(obj)): a, b = b, ({'jacobsthal': b + 2*a, 'pell': 2*b + a}.get(_m, a + b))
                 return a
             return ('builtin', _fib)
         if member == 'toWords':
