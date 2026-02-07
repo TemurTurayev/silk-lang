@@ -214,8 +214,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
         if member in ('toXML', 'toYAML', 'toINI', 'toEnvironment'):
             return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{'export ' if member == 'toEnvironment' else ''}{k}{'=' if member in ('toINI', 'toEnvironment') else ': '}{silk_repr(v)}" for k, v in obj.items()))
-        if member in ('toSQLInsert', 'toSQLUpdate'):
-            return ('builtin', lambda args, ctx: f"INSERT INTO {args[0]} ({', '.join(obj.keys())}) VALUES ({', '.join(silk_repr(v) for v in obj.values())})" if member == 'toSQLInsert' else f"UPDATE {args[0]} SET {', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}")
+        if member in ('toSQLInsert', 'toSQLUpdate', 'toSQLWhere'):
+            return ('builtin', lambda args, ctx: f"INSERT INTO {args[0]} ({', '.join(obj.keys())}) VALUES ({', '.join(silk_repr(v) for v in obj.values())})" if member == 'toSQLInsert' else f"UPDATE {args[0]} SET {', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}" if member == 'toSQLUpdate' else f"SELECT * FROM {args[0]} WHERE {' AND '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}")
         if member in ('toDotNotation', 'fromDotNotation'):
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
@@ -248,6 +248,7 @@ class MemberMixin:
             'accumulate': lambda: list(__import__('itertools').accumulate(obj)), 'cumulativeSum': lambda: list(__import__('itertools').accumulate(obj)),
             'adjacentDiff': lambda: [obj[i+1] - obj[i] for i in range(len(obj) - 1)],
             'runningAverage': lambda: [(lambda s: int(s) if s == int(s) else s)(sum(obj[:i+1]) / (i+1)) for i in range(len(obj))],
+            'duplicates': lambda: list(dict.fromkeys(x for x in obj if obj.count(x) > 1)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -474,6 +475,7 @@ class MemberMixin:
             'countVowels': lambda: sum(1 for c in obj.lower() if c in 'aeiou'),
             'countConsonants': lambda: sum(1 for c in obj.lower() if c.isalpha() and c not in 'aeiou'),
             'mirror': lambda: obj + obj[::-1],
+            'toAlternatingCase': lambda: ''.join(c.upper() if i % 2 else c.lower() for i, c in enumerate(obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -665,6 +667,7 @@ class MemberMixin:
             'isEmirp': lambda: (lambda n, ip: ip(n) and (r := int(str(n)[::-1])) != n and ip(r))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1))),
             'pentagonal': lambda: int(obj) * (3 * int(obj) - 1) // 2,
             'hexagonal': lambda: int(obj) * (2 * int(obj) - 1),
+            'catalan': lambda: math.factorial(2 * int(obj)) // (math.factorial(int(obj) + 1) * math.factorial(int(obj))),
         }
         if member in _simple:
             fn = _simple[member]
