@@ -183,6 +183,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'countValues':
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
+        if member == 'keysByValue':
+            return ('builtin', lambda args, ctx: [k for k, v in obj.items() if v == args[0]])
         if member == 'valueSet':
             return ('builtin', lambda args, ctx: list(dict.fromkeys(obj.values())))
         if member == 'swapKeyValue':
@@ -235,6 +237,7 @@ class MemberMixin:
             'zipWith': lambda a: [self._call_function(a[1], [x, y]) for x, y in zip(obj, a[0])],
             'windows': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)],
             'splitAt': lambda a: [obj[:int(a[0])], obj[int(a[0]):]],
+            'cycle': lambda a: obj * int(a[0]),
             'intersperse': lambda a: [x for i, v in enumerate(obj) for x in (([a[0], v] if i > 0 else [v]))],
         }
         if member in _onearg:
@@ -410,12 +413,7 @@ class MemberMixin:
                 return mid / 2 if mid % 2 else mid // 2
             return ('builtin', _med)
         if member == 'mode':
-            def _mode(args, ctx):
-                c = {}
-                for x in obj: c[x] = c.get(x, 0) + 1
-                m = max(c.values())
-                return [k for k, v in c.items() if v == m]
-            return ('builtin', _mode)
+            return ('builtin', lambda args, ctx: (lambda c: [k for k, v in c.items() if v == max(c.values())])((lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({})))
         if member in ('stddev', 'variance'):
             def _sv(args, ctx):
                 v = sum((x - sum(obj) / len(obj)) ** 2 for x in obj) / len(obj)
@@ -498,6 +496,7 @@ class MemberMixin:
             'isPangram': lambda: set('abcdefghijklmnopqrstuvwxyz').issubset(obj.lower()),
             'collapseWhitespace': lambda: ' '.join(obj.split()),
             'reverseWords': lambda: ' '.join(obj.split()[::-1]),
+            'trimLines': lambda: '\n'.join(l.strip() for l in obj.split('\n')),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -674,6 +673,7 @@ class MemberMixin:
             'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9, 'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
             'sumTo': lambda: int(obj) * (int(obj) + 1) // 2,
             'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
+            'isAutomorphic': lambda: str(int(obj) ** 2).endswith(str(int(obj))),
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
         }
         if member in _simple:
