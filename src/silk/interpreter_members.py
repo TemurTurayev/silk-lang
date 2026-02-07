@@ -97,6 +97,7 @@ class MemberMixin:
             'sortByValue': lambda: [[k, v] for k, v in sorted(obj.items(), key=lambda x: x[1])],
             'toQueryString': lambda: '&'.join(f"{k}={v}" for k, v in obj.items()),
             'toFormattedString': lambda: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
+            'sumValues': lambda: sum(obj.values()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -293,6 +294,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: any(self._call_function(args[0], [item]) for item in obj))
         if member == 'flat':
             return ('builtin', lambda args, ctx: [x for i in obj for x in (i if isinstance(i, list) else [i])])
+        if member == 'flattenDeep':
+            return ('builtin', lambda args, ctx: (f := lambda a: [x for i in a for x in (f(i) if isinstance(i, list) else [i])])(obj))
         if member == 'flatMap':
             def _fm(args, ctx):
                 return [y for x in obj for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [x]))]
@@ -332,19 +335,9 @@ class MemberMixin:
                 return _f(obj, int(args[0]) if args else 1)
             return ('builtin', _fl)
         if member == 'takeWhile':
-            def _tw(args, ctx):
-                r = []
-                for x in obj:
-                    if not self._call_function(args[0], [x]): break
-                    r.append(x)
-                return r
-            return ('builtin', _tw)
+            return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda x: self._call_function(args[0], [x]), obj)))
         if member in ('skipWhile', 'dropWhile'):
-            def _sw(args, ctx):
-                i = 0
-                while i < len(obj) and self._call_function(args[0], [obj[i]]): i += 1
-                return obj[i:]
-            return ('builtin', _sw)
+            return ('builtin', lambda args, ctx: list(__import__('itertools').dropwhile(lambda x: self._call_function(args[0], [x]), obj)))
         if member == 'scan':
             def _scan(args, ctx):
                 r, acc = [], args[1]
@@ -641,6 +634,8 @@ class MemberMixin:
             return ('builtin', _ib)
         if member == 'isISBN':
             return ('builtin', lambda args, ctx: len(obj) == 10 and obj[:9].isdigit() and sum((10-i)*int(c) for i, c in enumerate(obj[:9])) % 11 == (11 - int(obj[9])) % 11 if obj[9].isdigit() else False)
+        if member == 'isCreditCard':
+            return ('builtin', lambda args, ctx: obj.isdigit() and len(obj) >= 13 and sum(int(d) for d in obj[-1::-2]) + sum(sum(divmod(2 * int(d), 10)) for d in obj[-2::-2]) == 0 if not obj.isdigit() else (sum(int(d) for d in obj[-1::-2]) + sum(sum(divmod(2 * int(d), 10)) for d in obj[-2::-2])) % 10 == 0)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -676,6 +671,7 @@ class MemberMixin:
             'sumOfSquares': lambda: sum(i * i for i in range(1, int(obj) + 1)),
             'isNarcissistic': lambda: (lambda s, n: sum(int(d) ** n for d in s) == int(obj))(str(abs(int(obj))), len(str(abs(int(obj))))),
             'isSquare': lambda: int(obj) >= 0 and int(obj ** 0.5) ** 2 == int(obj),
+            'isCube': lambda: round(abs(int(obj)) ** (1/3)) ** 3 == abs(int(obj)),
         }
         if member in _simple:
             fn = _simple[member]
