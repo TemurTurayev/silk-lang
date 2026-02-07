@@ -220,6 +220,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toMarkdown':
+            return ('builtin', lambda args, ctx: '| ' + ' | '.join(str(k) for k in obj.keys()) + ' |\n| ' + ' | '.join('---' for _ in obj) + ' |\n| ' + ' | '.join(silk_repr(v) for v in obj.values()) + ' |')
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -414,6 +416,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'uniqueBy':
+            return ('builtin', lambda args, ctx: (lambda s: [x for x in obj if (k := self._call_function(args[0], [x])) not in s and not s.add(k)])(set()))
         if member in ('pairMap', 'mapPairs'):
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i], obj[i+1]]) for i in range(len(obj) - 1)])
         if member == 'runLengthEncode':
@@ -478,6 +482,7 @@ class MemberMixin:
             'mirror': lambda: obj + obj[::-1],
             'toAlternatingCase': lambda: ''.join(c.upper() if i % 2 else c.lower() for i, c in enumerate(obj)),
             'isUpperCamelCase': lambda: bool(__import__('re').match(r'^[A-Z][a-zA-Z0-9]*$', obj)),
+            'isCamelCase': lambda: bool(__import__('re').match(r'^[a-z][a-zA-Z0-9]*$', obj)) and not '_' in obj,
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -671,6 +676,7 @@ class MemberMixin:
             'hexagonal': lambda: int(obj) * (2 * int(obj) - 1),
             'catalan': lambda: math.factorial(2 * int(obj)) // (math.factorial(int(obj) + 1) * math.factorial(int(obj))),
             'bell': lambda: __import__('functools').reduce(lambda r, _: (s := [r[-1]]) and [s.append(s[-1]+v) for v in r] and s, range(int(obj)), [1])[0],
+            'derangements': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
         }
         if member in _simple:
             fn = _simple[member]
@@ -705,12 +711,7 @@ class MemberMixin:
         if member == 'isPrime':
             return ('builtin', lambda args, ctx: int(obj) >= 2 and all(int(obj) % i for i in range(2, int(int(obj)**0.5) + 1)))
         if member == 'toRoman':
-            def _rm(args, ctx):
-                n, r = int(obj), ''
-                for v, s in [(1000,'M'),(900,'CM'),(500,'D'),(400,'CD'),(100,'C'),(90,'XC'),(50,'L'),(40,'XL'),(10,'X'),(9,'IX'),(5,'V'),(4,'IV'),(1,'I')]:
-                    while n >= v: r += s; n -= v
-                return r
-            return ('builtin', _rm)
+            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda nr, vs: (nr[0] % vs[0], nr[1] + vs[1] * (nr[0] // vs[0])), [(1000,'M'),(900,'CM'),(500,'D'),(400,'CD'),(100,'C'),(90,'XC'),(50,'L'),(40,'XL'),(10,'X'),(9,'IX'),(5,'V'),(4,'IV'),(1,'I')], (int(obj), ''))[1])
         if member in ('fibonacci', 'lucasNumber', 'tribonacci'):
             def _fib(args, ctx):
                 if member == 'tribonacci':
