@@ -188,6 +188,8 @@ class MemberMixin:
                     return [y for k, v in d.items() for y in (_p(v, f"{pfx}.{k}" if pfx else k) if isinstance(v, dict) else [f"{pfx}.{k}" if pfx else k])]
                 return _p(obj)
             return ('builtin', _ps)
+        if member == 'updateIn':
+            return ('builtin', lambda args, ctx: {k: (self._call_function(args[1], [v]) if k == args[0] else v) for k, v in obj.items()})
         if member == 'keysByValue':
             return ('builtin', lambda args, ctx: [k for k, v in obj.items() if v == args[0]])
         if member == 'valueSet':
@@ -286,12 +288,7 @@ class MemberMixin:
                 return [y for x in obj for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [x]))]
             return ('builtin', _fm)
         if member == 'unique':
-            def _u(args, ctx):
-                s, r = [], []
-                for x in obj:
-                    if x not in s: s.append(x); r.append(x)
-                return r
-            return ('builtin', _u)
+            return ('builtin', lambda args, ctx: list(dict.fromkeys(obj)))
         if member == 'count':
             return ('builtin', lambda args, ctx: sum(1 for item in obj if self._call_function(args[0], [item])))
         if member == 'sortBy':
@@ -323,11 +320,7 @@ class MemberMixin:
         if member == 'findLastIndex':
             return ('builtin', lambda args, ctx: next((i for i in range(len(obj)-1, -1, -1) if self._call_function(args[0], [obj[i]])), -1))
         if member in ('tally', 'frequencies'):
-            def _tally(args, ctx):
-                c = {}
-                for x in obj: c[x] = c.get(x, 0) + 1
-                return c
-            return ('builtin', _tally)
+            return ('builtin', lambda args, ctx: (lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({}))
         if member == 'interleave':
             def _il(args, ctx):
                 return [x for i in range(max(len(obj), len(args[0]))) for x in ([obj[i]] if i < len(obj) else []) + ([args[0][i]] if i < len(args[0]) else [])]
@@ -369,12 +362,7 @@ class MemberMixin:
         if member == 'reject':
             return ('builtin', lambda args, ctx: [item for item in obj if not self._call_function(args[0], [item])])
         if member == 'union':
-            def _un(args, ctx):
-                s, r = [], []
-                for x in obj + args[0]:
-                    if x not in s: s.append(x); r.append(x)
-                return r
-            return ('builtin', _un)
+            return ('builtin', lambda args, ctx: list(dict.fromkeys(obj + args[0])))
         if member == 'shuffle':
             def _sh(args, ctx):
                 c = list(obj); random.shuffle(c); return c
@@ -461,6 +449,15 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'runLengthEncode':
+            def _rle(args, ctx):
+                if not obj: return []
+                r = [[obj[0], 1]]
+                for x in obj[1:]:
+                    if x == r[-1][0]: r[-1][1] += 1
+                    else: r.append([x, 1])
+                return r
+            return ('builtin', _rle)
         if member == 'foldRight':
             def _fr(args, ctx):
                 acc = args[1]
@@ -500,6 +497,7 @@ class MemberMixin:
             'collapseWhitespace': lambda: ' '.join(obj.split()),
             'reverseWords': lambda: ' '.join(obj.split()[::-1]),
             'trimLines': lambda: '\n'.join(l.strip() for l in obj.split('\n')),
+            'removeDuplicateChars': lambda: ''.join(obj[i] for i in range(len(obj)) if i == 0 or obj[i] != obj[i-1]),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -583,9 +581,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: list(obj.partition(args[0])))
         if member in ('commonPrefix', 'commonSuffix'):
             def _cp(args, ctx):
-                o, a, b = args[0], *((obj, args[0]) if member == 'commonPrefix' else (obj[::-1], args[0][::-1])),
-                i = 0
-                while i < len(a) and i < len(b) and a[i] == b[i]: i += 1
+                a, b = (obj, args[0]) if member == 'commonPrefix' else (obj[::-1], args[0][::-1])
+                i = next((i for i in range(min(len(a), len(b))) if a[i] != b[i]), min(len(a), len(b)))
                 return obj[:i] if member == 'commonPrefix' else (obj[len(obj)-i:] if i else '')
             return ('builtin', _cp)
         if member == 'levenshtein':
@@ -676,6 +673,7 @@ class MemberMixin:
             'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
             'isAutomorphic': lambda: str(int(obj) ** 2).endswith(str(int(obj))),
             'toBits': lambda: [int(b) for b in bin(int(obj))[2:]],
+            'isKaprekar': lambda: (lambda n, sq: any(int(str(sq)[:i]) + int(str(sq)[i:]) == n for i in range(1, len(str(sq)))) if n > 0 else False)(int(obj), int(obj) ** 2),
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
         }
         if member in _simple:
