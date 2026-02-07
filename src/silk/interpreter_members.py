@@ -179,8 +179,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [k for k in obj if k not in args[0]])
         if member == 'commonKeys':
             return ('builtin', lambda args, ctx: [k for k in obj if k in args[0]])
-        if member == 'valuesWhere':
-            return ('builtin', lambda args, ctx: [v for k, v in obj.items() if self._call_function(args[0], [k, v])])
+        if member in ('valuesWhere', 'keysWhere'):
+            return ('builtin', lambda args, ctx: [(v if member == 'valuesWhere' else k) for k, v in obj.items() if self._call_function(args[0], [k, v])])
         if member in ('toSortedKeys', 'sortByKey'):
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'toSortedValues':
@@ -241,6 +241,7 @@ class MemberMixin:
             'toString': lambda: silk_repr(obj),
             'zipWithIndex': lambda: [[v, i] for i, v in enumerate(obj)],
             'unzip': lambda: [list(t) for t in zip(*obj)] if obj else [],
+            'maxIndex': lambda: obj.index(max(obj)), 'minIndex': lambda: obj.index(min(obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -508,6 +509,7 @@ class MemberMixin:
             'padCenter': lambda a: obj.center(int(a[0]), a[1]),
             'wrapEach': lambda a: ''.join(a[0] + c + a[1] for c in obj),
             'replaceAt': lambda a: obj[:int(a[0])] + a[1] + obj[int(a[0])+1:],
+            'insertAt': lambda a: obj[:int(a[0])] + a[1] + obj[int(a[0]):],
         }
         if member in _twoarg:
             fn = _twoarg[member]
@@ -649,7 +651,7 @@ class MemberMixin:
             'toHex': lambda: hex(int(obj))[2:], 'toChar': lambda: chr(int(obj)),
             'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
             'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
-            'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
+            'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0), 'divisorCount': lambda: sum(1 for i in range(1, int(obj) + 1) if int(obj) % i == 0),
             'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9, 'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
             'sumTo': lambda: int(obj) * (int(obj) + 1) // 2,
             'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
