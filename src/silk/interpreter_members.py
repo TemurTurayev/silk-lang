@@ -214,8 +214,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
         if member in ('toXML', 'toYAML', 'toINI', 'toEnvironment'):
             return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{'export ' if member == 'toEnvironment' else ''}{k}{'=' if member in ('toINI', 'toEnvironment') else ': '}{silk_repr(v)}" for k, v in obj.items()))
-        if member in ('toSQLInsert', 'toSQLUpdate', 'toSQLWhere'):
-            return ('builtin', lambda args, ctx: f"INSERT INTO {args[0]} ({', '.join(obj.keys())}) VALUES ({', '.join(silk_repr(v) for v in obj.values())})" if member == 'toSQLInsert' else f"UPDATE {args[0]} SET {', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}" if member == 'toSQLUpdate' else f"SELECT * FROM {args[0]} WHERE {' AND '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}")
+        if member in ('toSQLInsert', 'toSQLUpdate', 'toSQLWhere', 'toSQLDelete'):
+            return ('builtin', lambda args, ctx: f"INSERT INTO {args[0]} ({', '.join(obj.keys())}) VALUES ({', '.join(silk_repr(v) for v in obj.values())})" if member == 'toSQLInsert' else f"UPDATE {args[0]} SET {', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}" if member == 'toSQLUpdate' else f"SELECT * FROM {args[0]} WHERE {' AND '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}" if member == 'toSQLWhere' else f"DELETE FROM {args[0]} WHERE {' AND '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}")
         if member in ('toDotNotation', 'fromDotNotation'):
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
@@ -275,6 +275,7 @@ class MemberMixin:
             'dropRight': lambda a: obj[:-int(a[0])] if int(a[0]) > 0 else list(obj),
             'intersperse': lambda a: [x for i, v in enumerate(obj) for x in (([a[0], v] if i > 0 else [v]))],
             'takeEvery': lambda a: obj[::int(a[0])],
+            'everyNth': lambda a: obj[int(a[0])-1::int(a[0])],
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -476,6 +477,7 @@ class MemberMixin:
             'countConsonants': lambda: sum(1 for c in obj.lower() if c.isalpha() and c not in 'aeiou'),
             'mirror': lambda: obj + obj[::-1],
             'toAlternatingCase': lambda: ''.join(c.upper() if i % 2 else c.lower() for i, c in enumerate(obj)),
+            'isUpperCamelCase': lambda: bool(__import__('re').match(r'^[A-Z][a-zA-Z0-9]*$', obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -668,6 +670,7 @@ class MemberMixin:
             'pentagonal': lambda: int(obj) * (3 * int(obj) - 1) // 2,
             'hexagonal': lambda: int(obj) * (2 * int(obj) - 1),
             'catalan': lambda: math.factorial(2 * int(obj)) // (math.factorial(int(obj) + 1) * math.factorial(int(obj))),
+            'bell': lambda: __import__('functools').reduce(lambda r, _: (s := [r[-1]]) and [s.append(s[-1]+v) for v in r] and s, range(int(obj)), [1])[0],
         }
         if member in _simple:
             fn = _simple[member]
@@ -694,10 +697,7 @@ class MemberMixin:
         if member == 'map':
             return ('builtin', lambda args, ctx: self._call_function(args[0], [obj]))
         if member in ('percent', 'percentOf'):
-            def _pct(args, ctx):
-                r = (obj / 100) if member == 'percent' else (obj * args[0] / 100)
-                return int(r) if r == int(r) else r
-            return ('builtin', _pct)
+            return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)((obj / 100) if member == 'percent' else (obj * args[0] / 100)))
         if member == 'toPercent':
             return ('builtin', lambda args, ctx: f"{int(v) if (v := round(obj * 100, 10)) == int(v) else v}%")
         if member == 'toOrdinal':
