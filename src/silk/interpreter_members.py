@@ -178,7 +178,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [k for k in obj if k in args[0]])
         if member == 'valuesWhere':
             return ('builtin', lambda args, ctx: [v for k, v in obj.items() if self._call_function(args[0], [k, v])])
-        if member == 'toSortedKeys':
+        if member in ('toSortedKeys', 'sortByKey'):
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'countValues':
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
@@ -231,6 +231,7 @@ class MemberMixin:
             'adjacentPairs': lambda: [[obj[i], obj[i+1]] for i in range(len(obj) - 1)],
             'toString': lambda: silk_repr(obj),
             'zipWithIndex': lambda: [[v, i] for i, v in enumerate(obj)],
+            'unzip': lambda: [list(t) for t in zip(*obj)] if obj else [],
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -373,12 +374,7 @@ class MemberMixin:
         if member == 'associate':
             return ('builtin', lambda args, ctx: {(p := self._call_function(args[0], [x]))[0]: p[1] for x in obj})
         if member == 'interpose':
-            def _ip(args, ctx):
-                if len(obj) <= 1: return list(obj)
-                r = [obj[0]]
-                for x in obj[1:]: r.append(args[0]); r.append(x)
-                return r
-            return ('builtin', _ip)
+            return ('builtin', lambda args, ctx: [x for i, v in enumerate(obj) for x in ([args[0], v] if i > 0 else [v])])
         if member == 'transpose':
             return ('builtin', lambda args, ctx: [list(row) for row in zip(*obj)])
         if member == 'combinations':
@@ -640,6 +636,8 @@ class MemberMixin:
                     elif c in _m and (not s or s.pop() != _m[c]): return False
                 return not s
             return ('builtin', _ib)
+        if member == 'isISBN':
+            return ('builtin', lambda args, ctx: len(obj) == 10 and obj[:9].isdigit() and sum((10-i)*int(c) for i, c in enumerate(obj[:9])) % 11 == (11 - int(obj[9])) % 11 if obj[9].isdigit() else False)
         raise RuntimeError_(f"'str' has no member '{member}'")
 
     def _eval_number_member(self, obj: int | float, member: str) -> Any:
@@ -687,6 +685,7 @@ class MemberMixin:
             'toBase': lambda a: _to_base(int(obj), int(a[0])),
             'toBinaryString': lambda a: bin(int(obj))[2:].zfill(int(a[0])),
             'isCoprime': lambda a: math.gcd(int(obj), int(a[0])) == 1,
+            'toBinaryArray': lambda a: [int(b) for b in bin(int(obj))[2:].zfill(int(a[0]))],
         }
         if member in _onearg:
             fn = _onearg[member]
