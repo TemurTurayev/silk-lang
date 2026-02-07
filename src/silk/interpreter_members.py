@@ -212,8 +212,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda d, k: d.get(k) if isinstance(d, dict) else None, args[0].split('.'), obj))
         if member == 'deepSet':
             return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
-        if member in ('toXML', 'toYAML'):
-            return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()))
+        if member in ('toXML', 'toYAML', 'toINI'):
+            return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{k}{'=' if member == 'toINI' else ': '}{silk_repr(v)}" for k, v in obj.items()))
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -361,9 +361,7 @@ class MemberMixin:
         if member == 'shuffle':
             return ('builtin', lambda args, ctx: random.sample(obj, len(obj)))
         if member == 'forEachIndexed':
-            def _fei(args, ctx):
-                for i, x in enumerate(obj): self._call_function(args[0], [i, x])
-            return ('builtin', _fei)
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [i, x]) for i, x in enumerate(obj)] and None)
         if member == 'symmetricDifference':
             return ('builtin', lambda args, ctx: [x for x in obj if x not in args[0]] + [x for x in args[0] if x not in obj])
         if member == 'at':
@@ -390,7 +388,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda c: [k for k, v in c.items() if v == max(c.values())])((lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({})))
         if member in ('stddev', 'variance'):
             return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)((lambda v: v ** 0.5 if member == 'stddev' else v)(sum((x - sum(obj)/len(obj)) ** 2 for x in obj) / len(obj))))
-        if member in ('chunkBy', 'partitionBy'):
+        if member in ('chunkBy', 'partitionBy', 'segmentBy'):
             return ('builtin', lambda args, ctx: [list(g) for _, g in __import__('itertools').groupby(obj, key=lambda x: self._call_function(args[0], [x]))] if obj else [])
         if member == 'sliding':
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj) - int(args[0]) + 1, int(args[1]))])
@@ -533,11 +531,11 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: __import__('re').sub(r' {2,}', ' ', obj))
         if member == 'at':
             return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
-        if member in ('camelCase', 'snakeCase', 'kebabCase', 'titleCase', 'toPascalCase', 'toConstantCase', 'toDotCase', 'toPathCase'):
+        if member in ('camelCase', 'snakeCase', 'kebabCase', 'titleCase', 'toPascalCase', 'toConstantCase', 'toDotCase', 'toPathCase', 'toTrainCase'):
             def _cc(args, ctx, _re=__import__('re')):
-                p = _re.split(r'[-_\s]+', obj)
+                p = [w for s in _re.split(r'[-_\s]+', obj) for w in _re.sub(r'([a-z])([A-Z])', r'\1_\2', s).split('_') if w]
                 if member == 'camelCase': return p[0].lower() + ''.join(w.capitalize() for w in p[1:])
-                if member in ('titleCase', 'toPascalCase'): return (' ' if member == 'titleCase' else '').join(w.capitalize() for w in p)
+                if member in ('titleCase', 'toPascalCase', 'toTrainCase'): return (' ' if member == 'titleCase' else '-' if member == 'toTrainCase' else '').join(w.capitalize() for w in p)
                 sep = {'snakeCase': '_', 'toConstantCase': '_', 'toDotCase': '.', 'toPathCase': '/'}.get(member, '-')
                 r = _re.sub(r'([a-z])([A-Z])', r'\1' + sep + r'\2', _re.sub(r'[-_\s]+', sep, obj))
                 return r.upper() if member == 'toConstantCase' else r.lower()
@@ -673,6 +671,7 @@ class MemberMixin:
             'abundantBy': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj),
             'isUntouchable': lambda: (lambda n: not any(sum(i for i in range(1, k) if k % i == 0) == n for k in range(2, 2*n+2)))(int(obj)),
             'isSphenic': lambda: (lambda n, pf: len(pf) == 3 and len(set(pf)) == 3)((n := int(obj)), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
+            'isSemiPrime': lambda: (lambda pf: len(pf) == 2)((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
         }
         if member in _simple:
             fn = _simple[member]
