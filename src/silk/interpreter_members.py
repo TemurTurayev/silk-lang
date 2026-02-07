@@ -97,6 +97,7 @@ class MemberMixin:
             'sortByValue': lambda: [[k, v] for k, v in sorted(obj.items(), key=lambda x: x[1])],
             'toQueryString': lambda: '&'.join(f"{k}={v}" for k, v in obj.items()),
             'toFormattedString': lambda: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
+            'toHeaderString': lambda: '\n'.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
             'sumValues': lambda: sum(obj.values()),
             'maxValue': lambda: max(obj.values()), 'minValue': lambda: min(obj.values()),
             'averageValue': lambda: (lambda r: int(r) if r == int(r) else r)(sum(obj.values()) / len(obj)),
@@ -369,6 +370,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {(p := self._call_function(args[0], [x]))[0]: p[1] for x in obj})
         if member == 'interpose':
             return ('builtin', lambda args, ctx: [x for i, v in enumerate(obj) for x in ([args[0], v] if i > 0 else [v])])
+        if member == 'crossProduct':
+            return ('builtin', lambda args, ctx: [[a, b] for a in obj for b in args[0]])
         if member == 'transpose':
             return ('builtin', lambda args, ctx: [list(row) for row in zip(*obj)])
         if member == 'combinations':
@@ -464,6 +467,7 @@ class MemberMixin:
             'isHex': lambda: len(obj) > 0 and all(c in '0123456789abcdefABCDEF' for c in obj),
             'isAscii': lambda: all(ord(c) < 128 for c in obj),
             'toHashCode': lambda: hash(obj),
+            'isDate': lambda: bool(__import__('re').match(r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$', obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -643,7 +647,7 @@ class MemberMixin:
             'sign': lambda: (1 if obj > 0 else (-1 if obj < 0 else 0)),
             'toRadians': lambda: obj * math.pi / 180, 'toDegrees': lambda: obj * 180 / math.pi,
             'factorial': lambda: math.factorial(int(obj)), 'toBinary': lambda: bin(int(obj))[2:],
-            'toHex': lambda: hex(int(obj))[2:], 'toChar': lambda: chr(int(obj)),
+            'toHex': lambda: hex(int(obj))[2:], 'toOctal': lambda: oct(int(obj))[2:], 'toChar': lambda: chr(int(obj)),
             'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
             'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
             'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0), 'divisorCount': lambda: sum(1 for i in range(1, int(obj) + 1) if int(obj) % i == 0),
