@@ -130,8 +130,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {k: self._call_function(args[0], [k, v]) for k, v in obj.items()})
         if member == 'count':
             return ('builtin', lambda args, ctx: sum(1 for k, v in obj.items() if self._call_function(args[0], [k, v])))
-        if member == 'mapValues':
-            return ('builtin', lambda args, ctx: {k: self._call_function(args[0], [v]) for k, v in obj.items()})
+        if member in ('mapValues', 'mapValuesWithKey'):
+            return ('builtin', lambda args, ctx: {k: self._call_function(args[0], [k, v] if member == 'mapValuesWithKey' else [v]) for k, v in obj.items()})
         if member == 'mapKeys':
             return ('builtin', lambda args, ctx: {self._call_function(args[0], [k]): v for k, v in obj.items()})
         if member in ('filterValues', 'filterKeys'):
@@ -421,7 +421,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i], obj[i+1]]) for i in range(len(obj) - 1)])
         if member == 'runLengthEncode':
             return ('builtin', lambda args, ctx: [[k, sum(1 for _ in g)] for k, g in __import__('itertools').groupby(obj)] if obj else [])
-        if member == 'foldRight':
+        if member in ('foldRight', 'reduceRight'):
             def _fr(args, ctx):
                 acc = args[1]
                 for x in reversed(obj): acc = self._call_function(args[0], [acc, x])
@@ -612,6 +612,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: len(_re.findall(args[0], obj)))
         if member == 'extractNumbers':
             return ('builtin', lambda args, ctx: [int(n) if n.isdigit() else float(n) for n in __import__('re').findall(r'-?\d+\.?\d*', obj)])
+        if member == 'extractEmails':
+            return ('builtin', lambda args, ctx: __import__('re').findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', obj))
         if member == 'wordFrequency':
             return ('builtin', lambda args, ctx: (lambda f: [f.update({w: f.get(w, 0) + 1}) for w in obj.split()] and f or f)({}) if obj.strip() else {})
         if member == 'isBalanced':
@@ -671,6 +673,7 @@ class MemberMixin:
             'isPronic': lambda: (lambda k: k * (k + 1) == int(obj))(int(int(obj) ** 0.5)),
             'digitProduct': lambda: __import__('functools').reduce(lambda a, b: a * b, (int(d) for d in str(abs(int(obj))))),
             'reverseDigits': lambda: int(str(abs(int(obj)))[::-1]) * (1 if int(obj) >= 0 else -1),
+            'isSmith': lambda: (lambda n, ds, pf: n > 1 and not all(n % i for i in range(2, int(n**0.5)+1)) and ds(n) == sum(ds(p) for p in pf(n)))(int(obj), lambda x: sum(int(d) for d in str(x)), lambda n: (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
         }
         if member in _simple:
             fn = _simple[member]
