@@ -217,6 +217,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toRubyHash':
+            return ('builtin', lambda args, ctx: '{' + ', '.join(f'"{k}" => {silk_repr(v)}' for k, v in obj.items()) + '}')
         if member == 'toLuaTable':
             return ('builtin', lambda args, ctx: '{' + ', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items()) + '}')
         if member == 'toJSONPretty':
@@ -415,6 +417,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'someIndexed':
+            return ('builtin', lambda args, ctx: any(self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))
         if member == 'flatMapIndexed':
             return ('builtin', lambda args, ctx: [y for i, x in enumerate(obj) for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [i, x]))])
         if member == 'reduceIndexed':
@@ -491,6 +495,7 @@ class MemberMixin:
             'squeezeBlanks': lambda: __import__('re').sub(r'\n{3,}', '\n\n', obj),
             'removeVowels': lambda: ''.join(c for c in obj if c.lower() not in 'aeiou'),
             'removeConsonants': lambda: ''.join(c for c in obj if not c.isalpha() or c.lower() in 'aeiou'),
+            'toCamelWords': lambda: __import__('re').sub(r'([a-z])([A-Z])', r'\1_\2', obj).split('_'),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -540,11 +545,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj[int(args[0]):int(args[1])] if len(args) > 1 else obj[int(args[0]):])
         if member in ('toInt', 'toFloat'):
             def _conv(args, ctx):
-                try:
-                    v = int(obj) if member == 'toInt' else float(obj)
-                    return v if member == 'toInt' or v != int(v) else int(v)
-                except ValueError:
-                    raise RuntimeError_(f"Cannot convert '{obj}' to {'int' if member == 'toInt' else 'float'}")
+                try: v = int(obj) if member == 'toInt' else float(obj); return v if member == 'toInt' or v != int(v) else int(v)
+                except ValueError: raise RuntimeError_(f"Cannot convert '{obj}' to {'int' if member == 'toInt' else 'float'}")
             return ('builtin', _conv)
         if member == 'format':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda r, a: r.replace('{}', silk_repr(a), 1), args, obj))
@@ -683,6 +685,7 @@ class MemberMixin:
             'derangements': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
             'motzkin': lambda: __import__('functools').reduce(lambda ab, i: (ab[1], ((2*i+1)*ab[1] + 3*(i-1)*ab[0]) // (i+2)), range(1, int(obj)+1), (1, 1))[1] if int(obj) > 0 else 1,
             'tetrahedral': lambda: int(obj) * (int(obj) + 1) * (int(obj) + 2) // 6,
+            'pyramidal': lambda: int(obj) * (int(obj) + 1) * (2 * int(obj) + 1) // 6,
         }
         if member in _simple:
             fn = _simple[member]
