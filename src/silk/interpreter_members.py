@@ -185,7 +185,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: dict(sorted(obj.items())))
         if member == 'toSortedValues':
             return ('builtin', lambda args, ctx: sorted(obj.values()))
-        if member == 'countValues':
+        if member in ('countValues', 'valueCounts'):
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
         if member == 'paths':
             def _ps(args, ctx):
@@ -410,6 +410,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj) - int(args[0]) + 1, int(args[1]))])
         if member == 'span':
             return ('builtin', lambda args, ctx: (lambda i: [obj[:i], obj[i:]])(next((i for i, x in enumerate(obj) if not self._call_function(args[0], [x])), len(obj))))
+        if member == 'splitWhen':
+            return ('builtin', lambda args, ctx: (lambda i: [obj[:i], obj[i:]] if i < len(obj) else [list(obj)])(next((i for i, x in enumerate(obj) if self._call_function(args[0], [x])), len(obj))))
         if member == 'mapWhile':
             return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda v: v is not False, (self._call_function(args[0], [x]) for x in obj))))
         if member == 'groupConsecutive':
@@ -492,6 +494,7 @@ class MemberMixin:
             'isAnagram': lambda a: sorted(obj.lower().replace(' ', '')) == sorted(a[0].lower().replace(' ', '')),
             'indent': lambda a: '\n'.join(' ' * int(a[0]) + l for l in obj.split('\n')),
             'surround': lambda a: a[0] + obj + a[0],
+            'removeAt': lambda a: obj[:int(a[0])] + obj[int(a[0])+1:],
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -669,6 +672,7 @@ class MemberMixin:
             'isTriangular': lambda: (lambda n: int((8*n+1)**0.5)**2 == 8*n+1)(int(obj)),
             'totient': lambda: sum(1 for i in range(1, int(obj) + 1) if math.gcd(i, int(obj)) == 1),
             'harmonicSum': lambda: (lambda r: int(r) if r == int(r) else r)(sum(1/i for i in range(1, int(obj) + 1))),
+            'isPronic': lambda: (lambda k: k * (k + 1) == int(obj))(int(int(obj) ** 0.5)),
         }
         if member in _simple:
             fn = _simple[member]
