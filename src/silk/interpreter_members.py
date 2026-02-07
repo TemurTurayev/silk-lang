@@ -214,8 +214,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
         if member in ('toXML', 'toYAML', 'toINI', 'toEnvironment'):
             return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{'export ' if member == 'toEnvironment' else ''}{k}{'=' if member in ('toINI', 'toEnvironment') else ': '}{silk_repr(v)}" for k, v in obj.items()))
-        if member == 'toSQLInsert':
-            return ('builtin', lambda args, ctx: f"INSERT INTO {args[0]} ({', '.join(obj.keys())}) VALUES ({', '.join(silk_repr(v) for v in obj.values())})")
+        if member in ('toSQLInsert', 'toSQLUpdate'):
+            return ('builtin', lambda args, ctx: f"INSERT INTO {args[0]} ({', '.join(obj.keys())}) VALUES ({', '.join(silk_repr(v) for v in obj.values())})" if member == 'toSQLInsert' else f"UPDATE {args[0]} SET {', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}")
         if member in ('toDotNotation', 'fromDotNotation'):
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
@@ -336,7 +336,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: next((x for x in reversed(obj) if self._call_function(args[0], [x])), None))
         if member == 'findLastIndex':
             return ('builtin', lambda args, ctx: next((i for i in range(len(obj)-1, -1, -1) if self._call_function(args[0], [obj[i]])), -1))
-        if member in ('tally', 'frequencies'):
+        if member in ('tally', 'frequencies', 'histogram'):
             return ('builtin', lambda args, ctx: (lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({}))
         if member == 'interleave':
             return ('builtin', lambda args, ctx: [x for i in range(max(len(obj), len(args[0]))) for x in ([obj[i]] if i < len(obj) else []) + ([args[0][i]] if i < len(args[0]) else [])])
@@ -473,6 +473,7 @@ class MemberMixin:
             'isPhoneNumber': lambda: bool(__import__('re').match(r'^[\+]?[\d\s\-\(\)]{7,}$', obj)),
             'countVowels': lambda: sum(1 for c in obj.lower() if c in 'aeiou'),
             'countConsonants': lambda: sum(1 for c in obj.lower() if c.isalpha() and c not in 'aeiou'),
+            'mirror': lambda: obj + obj[::-1],
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -606,13 +607,7 @@ class MemberMixin:
         if member == 'wordFrequency':
             return ('builtin', lambda args, ctx: (lambda f: [f.update({w: f.get(w, 0) + 1}) for w in obj.split()] and f or f)({}) if obj.strip() else {})
         if member == 'isBalanced':
-            def _ib(args, ctx, _m={')':'(',']':'[','}':'{'}):
-                s = []
-                for c in obj:
-                    if c in '([{': s.append(c)
-                    elif c in _m and (not s or s.pop() != _m[c]): return False
-                return not s
-            return ('builtin', _ib)
+            return ('builtin', lambda args, ctx, _m={')':'(',']':'[','}':'{'}: __import__('functools').reduce(lambda s, c: None if s is None else (s + [c] if c in '([{' else (None if not s or s.pop() != _m[c] else s) if c in _m else s), obj, []) == [])
         if member == 'isISBN':
             return ('builtin', lambda args, ctx: len(obj) == 10 and obj[:9].isdigit() and sum((10-i)*int(c) for i, c in enumerate(obj[:9])) % 11 == (11 - int(obj[9])) % 11 if obj[9].isdigit() else False)
         if member == 'occurrences':
@@ -669,6 +664,7 @@ class MemberMixin:
             'isSemiPrime': lambda: (lambda pf: len(pf) == 2)((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
             'isEmirp': lambda: (lambda n, ip: ip(n) and (r := int(str(n)[::-1])) != n and ip(r))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1))),
             'pentagonal': lambda: int(obj) * (3 * int(obj) - 1) // 2,
+            'hexagonal': lambda: int(obj) * (2 * int(obj) - 1),
         }
         if member in _simple:
             fn = _simple[member]
