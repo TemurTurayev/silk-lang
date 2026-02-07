@@ -176,6 +176,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: sorted(obj.values()))
         if member == 'symmetricDifference':
             return ('builtin', lambda args, ctx: {**{k: v for k, v in obj.items() if k not in args[0]}, **{k: v for k, v in args[0].items() if k not in obj}})
+        if member == 'intersectKeys':
+            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if k in args[0]})
         if member in ('countValues', 'valueCounts'):
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
         if member == 'paths':
@@ -340,11 +342,11 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda x: self._call_function(args[0], [x]), obj)))
         if member in ('skipWhile', 'dropWhile'):
             return ('builtin', lambda args, ctx: list(__import__('itertools').dropwhile(lambda x: self._call_function(args[0], [x]), obj)))
-        if member == 'scan':
+        if member in ('scan', 'scanRight'):
             def _scan(args, ctx):
-                r, acc = [], args[1]
-                for x in obj: acc = self._call_function(args[0], [acc, x]); r.append(acc)
-                return r
+                r, acc, items = [], args[1], (reversed(obj) if member == 'scanRight' else obj)
+                for x in items: acc = self._call_function(args[0], [acc, x]); r.append(acc)
+                return r[::-1] if member == 'scanRight' else r
             return ('builtin', _scan)
         if member == 'product':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda a, b: a * b, obj, 1))
@@ -389,15 +391,7 @@ class MemberMixin:
         if member in ('stddev', 'variance'):
             return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)((lambda v: v ** 0.5 if member == 'stddev' else v)(sum((x - sum(obj)/len(obj)) ** 2 for x in obj) / len(obj))))
         if member in ('chunkBy', 'partitionBy'):
-            def _cb(args, ctx):
-                if not obj: return []
-                r, g, p = [], [obj[0]], self._call_function(args[0], [obj[0]])
-                for x in obj[1:]:
-                    k = self._call_function(args[0], [x])
-                    if k == p: g.append(x)
-                    else: r.append(g); g = [x]; p = k
-                return r + [g]
-            return ('builtin', _cb)
+            return ('builtin', lambda args, ctx: [list(g) for _, g in __import__('itertools').groupby(obj, key=lambda x: self._call_function(args[0], [x]))] if obj else [])
         if member == 'sliding':
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj) - int(args[0]) + 1, int(args[1]))])
         if member == 'span':
@@ -609,6 +603,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [int(n) if n.isdigit() else float(n) for n in __import__('re').findall(r'-?\d+\.?\d*', obj)])
         if member == 'extractEmails':
             return ('builtin', lambda args, ctx: __import__('re').findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', obj))
+        if member == 'extractUrls':
+            return ('builtin', lambda args, ctx: __import__('re').findall(r'https?://[^\s]+', obj))
         if member == 'wordFrequency':
             return ('builtin', lambda args, ctx: (lambda f: [f.update({w: f.get(w, 0) + 1}) for w in obj.split()] and f or f)({}) if obj.strip() else {})
         if member == 'isBalanced':
@@ -685,6 +681,7 @@ class MemberMixin:
             'toBinaryArray': lambda a: [int(b) for b in bin(int(obj))[2:].zfill(int(a[0]))],
             'nthRoot': lambda a: (lambda r: int(r) if r == int(r) else r)(round(obj ** (1/a[0]), 10)),
             'isLychrel': lambda a: (f := lambda n, i: True if i <= 0 else (lambda r: False if str(r) == str(r)[::-1] else f(r, i-1))(n + int(str(n)[::-1])))(int(obj), int(a[0])),
+            'sumOfDigitsPower': lambda a: sum(int(d) ** int(a[0]) for d in str(abs(int(obj)))),
         }
         if member in _onearg:
             fn = _onearg[member]
