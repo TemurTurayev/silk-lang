@@ -220,6 +220,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toHTMLList':
+            return ('builtin', lambda args, ctx: '<ul>' + ''.join(f'<li>{k}: {silk_repr(v)}</li>' for k, v in obj.items()) + '</ul>')
         if member == 'toHTMLTable':
             return ('builtin', lambda args, ctx: '<table><tr>' + ''.join(f'<th>{k}</th>' for k in obj.keys()) + '</tr><tr>' + ''.join(f'<td>{silk_repr(v)}</td>' for v in obj.values()) + '</tr></table>')
         if member == 'toMarkdown':
@@ -418,6 +420,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'filterIndexed':
+            return ('builtin', lambda args, ctx: [x for i, x in enumerate(obj) if self._call_function(args[0], [i, x])])
         if member == 'groupByCount':
             return ('builtin', lambda args, ctx: (lambda n, s: [obj[i*s:(i+1)*s] for i in range(n)])(int(args[0]), len(obj) // int(args[0])))
         if member == 'uniqueBy':
@@ -488,6 +492,7 @@ class MemberMixin:
             'isUpperCamelCase': lambda: bool(__import__('re').match(r'^[A-Z][a-zA-Z0-9]*$', obj)),
             'isCamelCase': lambda: bool(__import__('re').match(r'^[a-z][a-zA-Z0-9]*$', obj)) and '_' not in obj,
             'isSnakeCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9_]*$', obj)) and '__' not in obj,
+            'isKebabCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9\-]*$', obj)) and '--' not in obj,
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -714,14 +719,14 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: int(obj) >= 2 and all(int(obj) % i for i in range(2, int(int(obj)**0.5) + 1)))
         if member == 'toRoman':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda nr, vs: (nr[0] % vs[0], nr[1] + vs[1] * (nr[0] // vs[0])), [(1000,'M'),(900,'CM'),(500,'D'),(400,'CD'),(100,'C'),(90,'XC'),(50,'L'),(40,'XL'),(10,'X'),(9,'IX'),(5,'V'),(4,'IV'),(1,'I')], (int(obj), ''))[1])
-        if member in ('fibonacci', 'lucasNumber', 'tribonacci'):
+        if member in ('fibonacci', 'lucasNumber', 'tribonacci', 'jacobsthal'):
             def _fib(args, ctx):
                 if member == 'tribonacci':
                     a, b, c = 0, 1, 1
                     for _ in range(int(obj)): a, b, c = b, c, a + b + c
                     return a
-                a, b = (0, 1) if member == 'fibonacci' else (2, 1)
-                for _ in range(int(obj)): a, b = b, a + b
+                a, b = {'fibonacci': (0, 1), 'lucasNumber': (2, 1), 'jacobsthal': (0, 1)}[member]
+                for _ in range(int(obj)): a, b = b, (a + b if member != 'jacobsthal' else b + 2 * a)
                 return a
             return ('builtin', _fib)
         if member == 'toWords':
@@ -748,9 +753,7 @@ class MemberMixin:
         if member == 'nthPrime':
             def _np(args, ctx):
                 c, p = 0, 1
-                while c < int(obj):
-                    p += 1
-                    if all(p % i for i in range(2, int(p**0.5) + 1)): c += 1
+                while c < int(obj): p += 1; c += all(p % i for i in range(2, int(p**0.5) + 1))
                 return p
             return ('builtin', _np)
         if member == 'isHappy':
@@ -777,11 +780,7 @@ class MemberMixin:
                 return n if n >= 2 else None
             return ('builtin', _pnp)
         if member == 'asTime':
-            def _at(args, ctx):
-                n = int(obj)
-                h, m, s = n // 3600, (n % 3600) // 60, n % 60
-                return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-            return ('builtin', _at)
+            return ('builtin', lambda args, ctx: (lambda n, h, m, s: f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}")(int(obj), int(obj) // 3600, (int(obj) % 3600) // 60, int(obj) % 60))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
