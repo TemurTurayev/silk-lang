@@ -98,6 +98,7 @@ class MemberMixin:
             'toQueryString': lambda: '&'.join(f"{k}={v}" for k, v in obj.items()),
             'toFormattedString': lambda: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
             'sumValues': lambda: sum(obj.values()),
+            'maxValue': lambda: max(obj.values()), 'minValue': lambda: min(obj.values()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -391,7 +392,7 @@ class MemberMixin:
                 r = v ** 0.5 if member == 'stddev' else v
                 return int(r) if r == int(r) else r
             return ('builtin', _sv)
-        if member == 'chunkBy':
+        if member in ('chunkBy', 'partitionBy'):
             def _cb(args, ctx):
                 if not obj: return []
                 r, g, p = [], [obj[0]], self._call_function(args[0], [obj[0]])
@@ -634,6 +635,8 @@ class MemberMixin:
             return ('builtin', _ib)
         if member == 'isISBN':
             return ('builtin', lambda args, ctx: len(obj) == 10 and obj[:9].isdigit() and sum((10-i)*int(c) for i, c in enumerate(obj[:9])) % 11 == (11 - int(obj[9])) % 11 if obj[9].isdigit() else False)
+        if member == 'occurrences':
+            return ('builtin', lambda args, ctx: [i for i in range(len(obj)) if obj[i:i+len(args[0])] == args[0]])
         if member == 'isCreditCard':
             return ('builtin', lambda args, ctx: obj.isdigit() and len(obj) >= 13 and sum(int(d) for d in obj[-1::-2]) + sum(sum(divmod(2 * int(d), 10)) for d in obj[-2::-2]) == 0 if not obj.isdigit() else (sum(int(d) for d in obj[-1::-2]) + sum(sum(divmod(2 * int(d), 10)) for d in obj[-2::-2])) % 10 == 0)
         raise RuntimeError_(f"'str' has no member '{member}'")
@@ -672,6 +675,7 @@ class MemberMixin:
             'isNarcissistic': lambda: (lambda s, n: sum(int(d) ** n for d in s) == int(obj))(str(abs(int(obj))), len(str(abs(int(obj))))),
             'isSquare': lambda: int(obj) >= 0 and int(obj ** 0.5) ** 2 == int(obj),
             'isCube': lambda: round(abs(int(obj)) ** (1/3)) ** 3 == abs(int(obj)),
+            'isMersennePrime': lambda: (lambda n: n > 1 and (n + 1) & n == 0 and all(n % i for i in range(2, int(n**0.5) + 1)))(int(obj)),
         }
         if member in _simple:
             fn = _simple[member]
