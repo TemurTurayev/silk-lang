@@ -144,13 +144,7 @@ class MemberMixin:
                         return k if member == 'findKey' else v
             return ('builtin', _find)
         if member == 'toJson':
-            def _tj(args, ctx):
-                def _c(v):
-                    if isinstance(v, (type(None), bool, int, float, str)): return v
-                    if isinstance(v, list): return [_c(i) for i in v]
-                    return {str(k): _c(val) for k, val in v.items()} if isinstance(v, dict) else str(v)
-                return json.dumps(_c(obj))
-            return ('builtin', _tj)
+            return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj)))
         if member == 'mapEntries':
             def _me(args, ctx):
                 return {(p := self._call_function(args[0], [k, v]))[0]: p[1] for k, v in obj.items()}
@@ -219,6 +213,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: '{\n' + ',\n'.join(f'  {silk_repr(k)}: {silk_repr(v)}' for k, v in obj.items()) + '\n}')
         if member == 'toKeyValueStrings':
             return ('builtin', lambda args, ctx: [f"{silk_repr(k)}{args[0]}{silk_repr(v)}" for k, v in obj.items()])
+        if member == 'deepGet':
+            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda d, k: d.get(k) if isinstance(d, dict) else None, args[0].split('.'), obj))
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -270,6 +266,7 @@ class MemberMixin:
             'takeRight': lambda a: obj[-int(a[0]):] if int(a[0]) > 0 else [],
             'dropRight': lambda a: obj[:-int(a[0])] if int(a[0]) > 0 else list(obj),
             'intersperse': lambda a: [x for i, v in enumerate(obj) for x in (([a[0], v] if i > 0 else [v]))],
+            'takeEvery': lambda a: obj[::int(a[0])],
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -497,6 +494,7 @@ class MemberMixin:
             'indent': lambda a: '\n'.join(' ' * int(a[0]) + l for l in obj.split('\n')),
             'surround': lambda a: a[0] + obj + a[0],
             'removeAt': lambda a: obj[:int(a[0])] + obj[int(a[0])+1:],
+            'wordWrap': lambda a: (lambda w, words: '\n'.join(lines) if (lines := __import__('functools').reduce(lambda acc, word: acc[:-1] + [acc[-1] + ' ' + word] if acc and len(acc[-1]) + 1 + len(word) <= w else acc + [word], words, [])) else '')(int(a[0]), obj.split()),
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -675,6 +673,7 @@ class MemberMixin:
             'totient': lambda: sum(1 for i in range(1, int(obj) + 1) if math.gcd(i, int(obj)) == 1),
             'harmonicSum': lambda: (lambda r: int(r) if r == int(r) else r)(sum(1/i for i in range(1, int(obj) + 1))),
             'isPronic': lambda: (lambda k: k * (k + 1) == int(obj))(int(int(obj) ** 0.5)),
+            'digitProduct': lambda: __import__('functools').reduce(lambda a, b: a * b, (int(d) for d in str(abs(int(obj))))),
         }
         if member in _simple:
             fn = _simple[member]
