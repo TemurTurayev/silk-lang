@@ -206,6 +206,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toGraphQL':
+            return ('builtin', lambda args, ctx: '{ ' + ', '.join(f'{k}: {silk_repr(v)}' for k, v in obj.items()) + ' }')
         if member == 'toSwiftDict':
             return ('builtin', lambda args, ctx: '[' + ', '.join(f'"{k}": {silk_repr(v)}' for k, v in obj.items()) + ']')
         if member == 'toPythonDict':
@@ -410,6 +412,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'mapWhileIndexed':
+            return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda v: v is not False, (self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))))
         if member == 'noneIndexed':
             return ('builtin', lambda args, ctx: not any(self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))
         if member == 'everyIndexed':
@@ -494,6 +498,7 @@ class MemberMixin:
             'removeConsonants': lambda: ''.join(c for c in obj if not c.isalpha() or c.lower() in 'aeiou'),
             'toCamelWords': lambda: __import__('re').sub(r'([a-z])([A-Z])', r'\1_\2', obj).split('_'),
             'toWordArray': lambda: obj.split(),
+            'charCount': lambda: len(set(obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -682,6 +687,7 @@ class MemberMixin:
             'motzkin': lambda: __import__('functools').reduce(lambda ab, i: (ab[1], ((2*i+1)*ab[1] + 3*(i-1)*ab[0]) // (i+2)), range(1, int(obj)+1), (1, 1))[1] if int(obj) > 0 else 1,
             'tetrahedral': lambda: int(obj) * (int(obj) + 1) * (int(obj) + 2) // 6,
             'pyramidal': lambda: int(obj) * (int(obj) + 1) * (2 * int(obj) + 1) // 6,
+            'star': lambda: 6 * int(obj) * (int(obj) - 1) + 1,
         }
         if member in _simple:
             fn = _simple[member]
@@ -767,16 +773,10 @@ class MemberMixin:
         if member == 'isAmicable':
             return ('builtin', lambda args, ctx: (lambda _ds: (lambda a, b: a != b and _ds(a) == b and _ds(b) == a)(int(obj), int(args[0])))(lambda n: sum(i for i in range(1, n) if n % i == 0)))
         if member == 'primeFactors':
-            def _pf(args, ctx):
-                n, f, d = int(obj), [], 2
-                while d * d <= n:
-                    while n % d == 0: f.append(d); n //= d
-                    d += 1
-                return f + ([n] if n > 1 else [])
-            return ('builtin', _pf)
+            return ('builtin', lambda args, ctx: (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2))
         if member in ('prevPrime', 'nextPrime'):
-            def _pnp(args, ctx):
-                n, d = int(obj) + (-1 if member == 'prevPrime' else 1), -1 if member == 'prevPrime' else 1
+            def _pnp(args, ctx, d=(-1 if member == 'prevPrime' else 1)):
+                n = int(obj) + d
                 while n >= 2 and not all(n % i for i in range(2, int(n**0.5) + 1)): n += d
                 return n if n >= 2 else None
             return ('builtin', _pnp)
