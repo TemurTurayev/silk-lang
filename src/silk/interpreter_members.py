@@ -217,6 +217,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [k, v]) for k, v in obj.items()])
         if member == 'toPrettyString':
             return ('builtin', lambda args, ctx: '{\n' + ',\n'.join(f'  {silk_repr(k)}: {silk_repr(v)}' for k, v in obj.items()) + '\n}')
+        if member == 'toKeyValueStrings':
+            return ('builtin', lambda args, ctx: [f"{silk_repr(k)}{args[0]}{silk_repr(v)}" for k, v in obj.items()])
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -242,6 +244,7 @@ class MemberMixin:
             'zipWithIndex': lambda: [[v, i] for i, v in enumerate(obj)],
             'unzip': lambda: [list(t) for t in zip(*obj)] if obj else [],
             'maxIndex': lambda: obj.index(max(obj)), 'minIndex': lambda: obj.index(min(obj)),
+            'accumulate': lambda: list(__import__('itertools').accumulate(obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -284,9 +287,7 @@ class MemberMixin:
         if member == 'filter':
             return ('builtin', lambda args, ctx: [item for item in obj if self._call_function(args[0], [item])])
         if member == 'forEach':
-            def _fe(args, ctx):
-                for x in obj: self._call_function(args[0], [x])
-            return ('builtin', _fe)
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in obj] and None)
         if member == 'reduce':
             def _reduce(args, ctx):
                 acc = args[1]
@@ -473,6 +474,7 @@ class MemberMixin:
             'sizeInBytes': lambda: len(obj.encode('utf-8')),
             'isWhitespace': lambda: len(obj) > 0 and obj.isspace(),
             'isHex': lambda: len(obj) > 0 and all(c in '0123456789abcdefABCDEF' for c in obj),
+            'isAscii': lambda: all(ord(c) < 128 for c in obj),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -687,6 +689,7 @@ class MemberMixin:
             'toBinaryString': lambda a: bin(int(obj))[2:].zfill(int(a[0])),
             'isCoprime': lambda a: math.gcd(int(obj), int(a[0])) == 1,
             'toBinaryArray': lambda a: [int(b) for b in bin(int(obj))[2:].zfill(int(a[0]))],
+            'nthRoot': lambda a: (lambda r: int(r) if r == int(r) else r)(round(obj ** (1/a[0]), 10)),
         }
         if member in _onearg:
             fn = _onearg[member]
