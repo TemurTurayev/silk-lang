@@ -220,6 +220,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toJSONPretty':
+            return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj), indent=2))
         if member == 'toHTMLList':
             return ('builtin', lambda args, ctx: '<ul>' + ''.join(f'<li>{k}: {silk_repr(v)}</li>' for k, v in obj.items()) + '</ul>')
         if member == 'toHTMLTable':
@@ -301,11 +303,7 @@ class MemberMixin:
         if member == 'forEach':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in obj] and None)
         if member == 'reduce':
-            def _reduce(args, ctx):
-                acc = args[1]
-                for x in obj: acc = self._call_function(args[0], [acc, x])
-                return acc
-            return ('builtin', _reduce)
+            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, x: self._call_function(args[0], [acc, x]), obj, args[1]))
         if member == 'find':
             return ('builtin', lambda args, ctx: next((x for x in obj if self._call_function(args[0], [x])), None))
         if member == 'findIndex':
@@ -420,6 +418,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'reduceIndexed':
+            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, ix: self._call_function(args[0], [acc, ix[0], ix[1]]), enumerate(obj), args[1]))
         if member == 'filterIndexed':
             return ('builtin', lambda args, ctx: [x for i, x in enumerate(obj) if self._call_function(args[0], [i, x])])
         if member == 'groupByCount':
@@ -437,11 +437,7 @@ class MemberMixin:
         if member == 'weightedAverage':
             return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)(sum(v*w for v, w in zip(obj, args[0])) / sum(args[0])))
         if member in ('foldRight', 'reduceRight'):
-            def _fr(args, ctx):
-                acc = args[1]
-                for x in reversed(obj): acc = self._call_function(args[0], [acc, x])
-                return acc
-            return ('builtin', _fr)
+            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, x: self._call_function(args[0], [acc, x]), reversed(obj), args[1]))
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -493,6 +489,7 @@ class MemberMixin:
             'isCamelCase': lambda: bool(__import__('re').match(r'^[a-z][a-zA-Z0-9]*$', obj)) and '_' not in obj,
             'isSnakeCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9_]*$', obj)) and '__' not in obj,
             'isKebabCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9\-]*$', obj)) and '--' not in obj,
+            'squeezeBlanks': lambda: __import__('re').sub(r'\n{3,}', '\n\n', obj),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -719,14 +716,14 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: int(obj) >= 2 and all(int(obj) % i for i in range(2, int(int(obj)**0.5) + 1)))
         if member == 'toRoman':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda nr, vs: (nr[0] % vs[0], nr[1] + vs[1] * (nr[0] // vs[0])), [(1000,'M'),(900,'CM'),(500,'D'),(400,'CD'),(100,'C'),(90,'XC'),(50,'L'),(40,'XL'),(10,'X'),(9,'IX'),(5,'V'),(4,'IV'),(1,'I')], (int(obj), ''))[1])
-        if member in ('fibonacci', 'lucasNumber', 'tribonacci', 'jacobsthal'):
+        if member in ('fibonacci', 'lucasNumber', 'tribonacci', 'jacobsthal', 'pell'):
             def _fib(args, ctx):
                 if member == 'tribonacci':
                     a, b, c = 0, 1, 1
                     for _ in range(int(obj)): a, b, c = b, c, a + b + c
                     return a
-                a, b = {'fibonacci': (0, 1), 'lucasNumber': (2, 1), 'jacobsthal': (0, 1)}[member]
-                for _ in range(int(obj)): a, b = b, (a + b if member != 'jacobsthal' else b + 2 * a)
+                a, b = {'fibonacci': (0, 1), 'lucasNumber': (2, 1), 'jacobsthal': (0, 1), 'pell': (0, 1)}[member]
+                for _ in range(int(obj)): a, b = b, ({'jacobsthal': b + 2*a, 'pell': 2*b + a}.get(member, a + b))
                 return a
             return ('builtin', _fib)
         if member == 'toWords':
