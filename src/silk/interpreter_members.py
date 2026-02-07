@@ -206,15 +206,11 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
-        if member == 'toTOML':
-            return ('builtin', lambda args, ctx: '\n'.join(f'{k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)}' for k, v in obj.items()))
-        if member == 'toGraphQL':
-            return ('builtin', lambda args, ctx: '{ ' + ', '.join(f'{k}: {silk_repr(v)}' for k, v in obj.items()) + ' }')
-        if member == 'toElixirMap':
-            return ('builtin', lambda args, ctx: '%{' + ', '.join(f'{k}: {json.dumps(v) if isinstance(v, str) else silk_repr(v)}' for k, v in obj.items()) + '}')
-        if member in ('toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
-            _o, _s, _c = {'toSwiftDict': ('[', '"{k}": {v}', ']'), 'toPythonDict': ('{', '"{k}": {v}', '}'), 'toRubyHash': ('{', '"{k}" => {v}', '}'), 'toLuaTable': ('{', '{k} = {v}', '}')}[member]
-            return ('builtin', lambda args, ctx, o=_o, s=_s, c=_c: o + ', '.join(s.format(k=k, v=silk_repr(v)) for k, v in obj.items()) + c)
+        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
+            _qv = lambda v: json.dumps(v) if isinstance(v, str) else silk_repr(v)
+            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
+            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
+            return ('builtin', lambda args, ctx, m=_m, cl=_cl: (m[1].join(m[2](k, v) for k, v in obj.items()) if m[0] is None else m[0] + m[1].join(m[2](k, v) for k, v in obj.items()) + cl.get(member, '')))
         if member == 'toJSONPretty':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj), indent=2))
         if member == 'toHTMLList':
@@ -415,6 +411,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in reversed(obj)] and None)
         if member == 'tapEach':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in obj] and obj)
+        if member == 'mapRight':
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in reversed(obj)])
         if member == 'mapWhileIndexed':
             return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda v: v is not False, (self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))))
         if member == 'noneIndexed':
@@ -504,6 +502,7 @@ class MemberMixin:
             'charCount': lambda: len(set(obj)),
             'encodeURI': lambda: __import__('urllib.parse', fromlist=['quote']).quote(obj, safe=''),
             'decodeURI': lambda: __import__('urllib.parse', fromlist=['unquote']).unquote(obj),
+            'toSlug': lambda: __import__('re').sub(r'-+', '-', __import__('re').sub(r'[^a-z0-9]+', '-', obj.lower())).strip('-'),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -694,6 +693,7 @@ class MemberMixin:
             'pyramidal': lambda: int(obj) * (int(obj) + 1) * (2 * int(obj) + 1) // 6,
             'star': lambda: 6 * int(obj) * (int(obj) - 1) + 1,
             'oblong': lambda: int(obj) * (int(obj) + 1), 'pronic': lambda: int(obj) * (int(obj) + 1),
+            'superFactorial': lambda: __import__('functools').reduce(lambda a, i: a * math.factorial(i), range(1, int(obj) + 1), 1),
         }
         if member in _simple:
             fn = _simple[member]
