@@ -211,6 +211,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
         if member == 'pluck':
             return ('builtin', lambda args, ctx: [obj[k] for k in args[0] if k in obj])
+        if member == 'transformEntries':
+            return ('builtin', lambda args, ctx: {self._call_function(args[0], [k]): self._call_function(args[1], [v]) for k, v in obj.items()})
         if member == 'mapToArray':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [k, v]) for k, v in obj.items()])
         if member in ('minByValue', 'maxByValue'):
@@ -256,7 +258,7 @@ class MemberMixin:
             'sample': lambda a: random.sample(list(obj), min(int(a[0]), len(obj))),
             'dotProduct': lambda a: sum(x * y for x, y in zip(obj, a[0])),
             'zipWith': lambda a: [self._call_function(a[1], [x, y]) for x, y in zip(obj, a[0])],
-            'windows': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)],
+            'windows': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)], 'aperture': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)],
             'splitAt': lambda a: [obj[:int(a[0])], obj[int(a[0]):]],
             'cycle': lambda a: obj * int(a[0]),
             'takeRight': lambda a: obj[-int(a[0]):] if int(a[0]) > 0 else [],
@@ -402,11 +404,7 @@ class MemberMixin:
         if member == 'sliding':
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj) - int(args[0]) + 1, int(args[1]))])
         if member == 'span':
-            def _span(args, ctx):
-                i = 0
-                while i < len(obj) and self._call_function(args[0], [obj[i]]): i += 1
-                return [obj[:i], obj[i:]]
-            return ('builtin', _span)
+            return ('builtin', lambda args, ctx: (lambda i: [obj[:i], obj[i:]])(next((i for i, x in enumerate(obj) if not self._call_function(args[0], [x])), len(obj))))
         if member == 'mapWhile':
             def _mw(args, ctx):
                 r = []
@@ -518,6 +516,7 @@ class MemberMixin:
             'mask': lambda a: a[0] * (len(obj) - int(a[1])) + obj[-int(a[1]):] if len(obj) > int(a[1]) else obj,
             'padCenter': lambda a: obj.center(int(a[0]), a[1]),
             'wrapEach': lambda a: ''.join(a[0] + c + a[1] for c in obj),
+            'replaceAt': lambda a: obj[:int(a[0])] + a[1] + obj[int(a[0])+1:],
         }
         if member in _twoarg:
             fn = _twoarg[member]
@@ -675,6 +674,7 @@ class MemberMixin:
             'isCube': lambda: round(abs(int(obj)) ** (1/3)) ** 3 == abs(int(obj)),
             'isMersennePrime': lambda: (lambda n: n > 1 and (n + 1) & n == 0 and all(n % i for i in range(2, int(n**0.5) + 1)))(int(obj)),
             'isTriangular': lambda: (lambda n: int((8*n+1)**0.5)**2 == 8*n+1)(int(obj)),
+            'totient': lambda: sum(1 for i in range(1, int(obj) + 1) if math.gcd(i, int(obj)) == 1),
         }
         if member in _simple:
             fn = _simple[member]
