@@ -202,6 +202,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {**args[0], **obj})
         if member == 'keyOf':
             return ('builtin', lambda args, ctx: next((k for k, v in obj.items() if v == args[0]), None))
+        if member == 'toTuples':
+            return ('builtin', lambda args, ctx: [[k, v] for k, v in obj.items()])
         if member == 'pluck':
             return ('builtin', lambda args, ctx: [obj[k] for k in args[0] if k in obj])
         if member in ('minByValue', 'maxByValue'):
@@ -295,11 +297,7 @@ class MemberMixin:
         if member == 'sortBy':
             return ('builtin', lambda args, ctx: sorted(obj, key=lambda item: self._call_function(args[0], [item])))
         if member == 'groupBy':
-            def _gb(args, ctx):
-                g = {}
-                for x in obj: g.setdefault(self._call_function(args[0], [x]), []).append(x)
-                return g
-            return ('builtin', _gb)
+            return ('builtin', lambda args, ctx: (lambda g: [g.setdefault(self._call_function(args[0], [x]), []).append(x) for x in obj] and g or g)({}))
         if member in ('chunked', 'chunk'):
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj), int(args[0]))])
         if member in ('window', 'windowed'):
@@ -340,7 +338,7 @@ class MemberMixin:
                     r.append(x)
                 return r
             return ('builtin', _tw)
-        if member == 'skipWhile':
+        if member in ('skipWhile', 'dropWhile'):
             def _sw(args, ctx):
                 i = 0
                 while i < len(obj) and self._call_function(args[0], [obj[i]]): i += 1
@@ -498,6 +496,7 @@ class MemberMixin:
             'trimLines': lambda: '\n'.join(l.strip() for l in obj.split('\n')),
             'removeDuplicateChars': lambda: ''.join(obj[i] for i in range(len(obj)) if i == 0 or obj[i] != obj[i-1]),
             'toAcronym': lambda: ''.join(w[0].upper() for w in obj.split() if w),
+            'sizeInBytes': lambda: len(obj.encode('utf-8')),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -690,6 +689,7 @@ class MemberMixin:
             'isBetween': lambda a: a[0] <= obj <= a[1],
             'toBase': lambda a: _to_base(int(obj), int(a[0])),
             'toBinaryString': lambda a: bin(int(obj))[2:].zfill(int(a[0])),
+            'isCoprime': lambda a: math.gcd(int(obj), int(a[0])) == 1,
         }
         if member in _onearg:
             fn = _onearg[member]
