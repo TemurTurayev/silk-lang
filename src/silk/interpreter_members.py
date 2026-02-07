@@ -210,14 +210,11 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: '\n'.join(f'{k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)}' for k, v in obj.items()))
         if member == 'toGraphQL':
             return ('builtin', lambda args, ctx: '{ ' + ', '.join(f'{k}: {silk_repr(v)}' for k, v in obj.items()) + ' }')
-        if member == 'toSwiftDict':
-            return ('builtin', lambda args, ctx: '[' + ', '.join(f'"{k}": {silk_repr(v)}' for k, v in obj.items()) + ']')
-        if member == 'toPythonDict':
-            return ('builtin', lambda args, ctx: '{' + ', '.join(f'"{k}": {silk_repr(v)}' for k, v in obj.items()) + '}')
-        if member == 'toRubyHash':
-            return ('builtin', lambda args, ctx: '{' + ', '.join(f'"{k}" => {silk_repr(v)}' for k, v in obj.items()) + '}')
-        if member == 'toLuaTable':
-            return ('builtin', lambda args, ctx: '{' + ', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items()) + '}')
+        if member == 'toElixirMap':
+            return ('builtin', lambda args, ctx: '%{' + ', '.join(f'{k}: {json.dumps(v) if isinstance(v, str) else silk_repr(v)}' for k, v in obj.items()) + '}')
+        if member in ('toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
+            _o, _s, _c = {'toSwiftDict': ('[', '"{k}": {v}', ']'), 'toPythonDict': ('{', '"{k}": {v}', '}'), 'toRubyHash': ('{', '"{k}" => {v}', '}'), 'toLuaTable': ('{', '{k} = {v}', '}')}[member]
+            return ('builtin', lambda args, ctx, o=_o, s=_s, c=_c: o + ', '.join(s.format(k=k, v=silk_repr(v)) for k, v in obj.items()) + c)
         if member == 'toJSONPretty':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj), indent=2))
         if member == 'toHTMLList':
@@ -416,6 +413,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
         if member == 'forEachRight':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in reversed(obj)] and None)
+        if member == 'tapEach':
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in obj] and obj)
         if member == 'mapWhileIndexed':
             return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda v: v is not False, (self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))))
         if member == 'noneIndexed':
@@ -504,6 +503,7 @@ class MemberMixin:
             'toWordArray': lambda: obj.split(),
             'charCount': lambda: len(set(obj)),
             'encodeURI': lambda: __import__('urllib.parse', fromlist=['quote']).quote(obj, safe=''),
+            'decodeURI': lambda: __import__('urllib.parse', fromlist=['unquote']).unquote(obj),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -693,7 +693,7 @@ class MemberMixin:
             'tetrahedral': lambda: int(obj) * (int(obj) + 1) * (int(obj) + 2) // 6,
             'pyramidal': lambda: int(obj) * (int(obj) + 1) * (2 * int(obj) + 1) // 6,
             'star': lambda: 6 * int(obj) * (int(obj) - 1) + 1,
-            'oblong': lambda: int(obj) * (int(obj) + 1),
+            'oblong': lambda: int(obj) * (int(obj) + 1), 'pronic': lambda: int(obj) * (int(obj) + 1),
         }
         if member in _simple:
             fn = _simple[member]
