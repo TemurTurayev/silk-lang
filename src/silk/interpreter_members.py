@@ -120,8 +120,8 @@ class MemberMixin:
             def _fe(args, ctx):
                 for k, v in obj.items(): self._call_function(args[0], [k, v])
             return ('builtin', _fe)
-        if member == 'filter':
-            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if self._call_function(args[0], [k, v])})
+        if member in ('filter', 'reject'):
+            return ('builtin', lambda args, ctx: {k: v for k, v in obj.items() if (not self._call_function(args[0], [k, v]) if member == 'reject' else self._call_function(args[0], [k, v]))})
         if member == 'map':
             return ('builtin', lambda args, ctx: {k: self._call_function(args[0], [k, v]) for k, v in obj.items()})
         if member == 'count':
@@ -298,16 +298,14 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: sorted(obj, key=lambda item: self._call_function(args[0], [item])))
         if member == 'groupBy':
             return ('builtin', lambda args, ctx: (lambda g: [g.setdefault(self._call_function(args[0], [x]), []).append(x) for x in obj] and g or g)({}))
+        if member == 'countBy':
+            return ('builtin', lambda args, ctx: (lambda c: [c.update({(k := self._call_function(args[0], [x])): c.get(k, 0) + 1}) for x in obj] and c or c)({}))
         if member in ('chunked', 'chunk'):
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj), int(args[0]))])
         if member in ('window', 'windowed'):
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(len(obj) - int(args[0]) + 1)])
         if member == 'rotate':
-            def _rot(args, ctx):
-                if not obj: return []
-                n = int(args[0]) % len(obj)
-                return obj[-n:] + obj[:-n] if n else list(obj)
-            return ('builtin', _rot)
+            return ('builtin', lambda args, ctx: (lambda n: obj[-n:] + obj[:-n] if n else list(obj))(int(args[0]) % len(obj)) if obj else [])
         if member == 'partition':
             def _part(args, ctx):
                 y, n = [], []
@@ -497,6 +495,7 @@ class MemberMixin:
             'removeDuplicateChars': lambda: ''.join(obj[i] for i in range(len(obj)) if i == 0 or obj[i] != obj[i-1]),
             'toAcronym': lambda: ''.join(w[0].upper() for w in obj.split() if w),
             'sizeInBytes': lambda: len(obj.encode('utf-8')),
+            'isWhitespace': lambda: len(obj) > 0 and obj.isspace(),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -677,6 +676,7 @@ class MemberMixin:
             'cubeRoot': lambda: (lambda r: int(r) if r == int(r) else r)(round(obj ** (1/3), 10)),
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
             'isPowerOfTwo': lambda: int(obj) > 0 and (int(obj) & (int(obj) - 1)) == 0,
+            'sumOfSquares': lambda: sum(i * i for i in range(1, int(obj) + 1)),
         }
         if member in _simple:
             fn = _simple[member]
