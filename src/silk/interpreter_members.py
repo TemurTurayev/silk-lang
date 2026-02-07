@@ -156,13 +156,7 @@ class MemberMixin:
         if member == 'groupByValue':
             return ('builtin', lambda args, ctx: (lambda g: [g.setdefault(v, []).append(k) for k, v in obj.items()] and g or g)({}))
         if member == 'deepMerge':
-            def _dm(args, ctx):
-                def _m(a, b):
-                    r = dict(a)
-                    for k, v in b.items(): r[k] = _m(r[k], v) if k in r and isinstance(r[k], dict) and isinstance(v, dict) else v
-                    return r
-                return _m(obj, args[0])
-            return ('builtin', _dm)
+            return ('builtin', lambda args, ctx: (m := lambda a, b: {k: m(a[k], v) if k in a and isinstance(a[k], dict) and isinstance(v, dict) else v for k, v in {**a, **b}.items()})(obj, args[0]))
         if member == 'renameKey':
             return ('builtin', lambda args, ctx: {(args[1] if k == args[0] else k): v for k, v in obj.items()})
         if member == 'selectKeys':
@@ -215,6 +209,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [f"{silk_repr(k)}{args[0]}{silk_repr(v)}" for k, v in obj.items()])
         if member == 'deepGet':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda d, k: d.get(k) if isinstance(d, dict) else None, args[0].split('.'), obj))
+        if member == 'deepSet':
+            return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -418,15 +414,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'pairMap':
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i], obj[i+1]]) for i in range(len(obj) - 1)])
         if member == 'runLengthEncode':
-            def _rle(args, ctx):
-                if not obj: return []
-                r = [[obj[0], 1]]
-                for x in obj[1:]:
-                    if x == r[-1][0]: r[-1][1] += 1
-                    else: r.append([x, 1])
-                return r
-            return ('builtin', _rle)
+            return ('builtin', lambda args, ctx: [[k, sum(1 for _ in g)] for k, g in __import__('itertools').groupby(obj)] if obj else [])
         if member == 'foldRight':
             def _fr(args, ctx):
                 acc = args[1]
@@ -472,6 +463,7 @@ class MemberMixin:
             'isWhitespace': lambda: len(obj) > 0 and obj.isspace(),
             'isHex': lambda: len(obj) > 0 and all(c in '0123456789abcdefABCDEF' for c in obj),
             'isAscii': lambda: all(ord(c) < 128 for c in obj),
+            'toHashCode': lambda: hash(obj),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -674,6 +666,7 @@ class MemberMixin:
             'harmonicSum': lambda: (lambda r: int(r) if r == int(r) else r)(sum(1/i for i in range(1, int(obj) + 1))),
             'isPronic': lambda: (lambda k: k * (k + 1) == int(obj))(int(int(obj) ** 0.5)),
             'digitProduct': lambda: __import__('functools').reduce(lambda a, b: a * b, (int(d) for d in str(abs(int(obj))))),
+            'reverseDigits': lambda: int(str(abs(int(obj)))[::-1]) * (1 if int(obj) >= 0 else -1),
         }
         if member in _simple:
             fn = _simple[member]
