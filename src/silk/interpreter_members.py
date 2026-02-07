@@ -92,8 +92,7 @@ class MemberMixin:
             'toQueryString': lambda: '&'.join(f"{k}={v}" for k, v in obj.items()), 'toFormattedString': lambda: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
             'toHeaderString': lambda: '\n'.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
             'sumValues': lambda: sum(obj.values()), 'maxValue': lambda: max(obj.values()), 'minValue': lambda: min(obj.values()),
-            'averageValue': lambda: (lambda r: int(r) if r == int(r) else r)(sum(obj.values()) / len(obj)),
-            'toProperties': lambda: '\n'.join(f"{k}={silk_repr(v)}" for k, v in obj.items()),
+            'averageValue': lambda: (lambda r: int(r) if r == int(r) else r)(sum(obj.values()) / len(obj)), 'toProperties': lambda: '\n'.join(f"{k}={silk_repr(v)}" for k, v in obj.items()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -203,10 +202,10 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
-        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toKotlinMap', 'toPhpArray', 'toRustStruct', 'toCSharpDict', 'toClojureMap', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
+        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toKotlinMap', 'toPhpArray', 'toRustStruct', 'toCSharpDict', 'toClojureMap', 'toHaskellMap', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
             _qv = lambda v: json.dumps(v) if isinstance(v, str) else silk_repr(v)
-            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toKotlinMap': ('mapOf(', ', ', lambda k, v: f'"{k}" to {_qv(v)}'), 'toPhpArray': ('[', ', ', lambda k, v: f'"{k}" => {_qv(v)}'), 'toRustStruct': ('Data { ', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toCSharpDict': ('{', ', ', lambda k, v: f'{{"{k}", {_qv(v)}}}'), 'toClojureMap': ('{', ', ', lambda k, v: f':{k} {_qv(v)}'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
-            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toKotlinMap': ')', 'toPhpArray': ']', 'toRustStruct': ' }', 'toCSharpDict': '}', 'toClojureMap': '}', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
+            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toKotlinMap': ('mapOf(', ', ', lambda k, v: f'"{k}" to {_qv(v)}'), 'toPhpArray': ('[', ', ', lambda k, v: f'"{k}" => {_qv(v)}'), 'toRustStruct': ('Data { ', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toCSharpDict': ('{', ', ', lambda k, v: f'{{"{k}", {_qv(v)}}}'), 'toClojureMap': ('{', ', ', lambda k, v: f':{k} {_qv(v)}'), 'toHaskellMap': ('fromList [', ', ', lambda k, v: f'("{k}", {_qv(v)})'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
+            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toKotlinMap': ')', 'toPhpArray': ']', 'toRustStruct': ' }', 'toCSharpDict': '}', 'toClojureMap': '}', 'toHaskellMap': ']', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
             return ('builtin', lambda args, ctx, m=_m, cl=_cl: (m[1].join(m[2](k, v) for k, v in obj.items()) if m[0] is None else m[0] + m[1].join(m[2](k, v) for k, v in obj.items()) + cl.get(member, '')))
         if member == 'toJSONPretty':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj), indent=2))
@@ -500,6 +499,7 @@ class MemberMixin:
             'toKebabCase': lambda: __import__('re').sub(r'[\s_]+', '-', __import__('re').sub(r'([a-z])([A-Z])', r'\1-\2', obj)).lower(),
             'toBase64': lambda: __import__('base64').b64encode(obj.encode()).decode(),
             'fromBase64': lambda: __import__('base64').b64decode(obj.encode()).decode(),
+            'toMd5': lambda: __import__('hashlib').md5(obj.encode()).hexdigest(),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -753,7 +753,7 @@ class MemberMixin:
                 while rem > 0: (p.append(_ch(rem % 1000) + s[len(p)]) if rem % 1000 else None); rem //= 1000
                 return ('negative ' if n < 0 else '') + ' '.join(reversed(p))
             return ('builtin', _tw)
-        if member in ('collatz', 'collatzSequence'):
+        if member in ('collatz', 'collatzLength', 'collatzSequence'):
             def _cz(args, ctx):
                 n, r = int(obj), [int(obj)]
                 while n != 1: n = n // 2 if n % 2 == 0 else 3 * n + 1; r.append(n)
