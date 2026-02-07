@@ -101,6 +101,7 @@ class MemberMixin:
             'sumValues': lambda: sum(obj.values()),
             'maxValue': lambda: max(obj.values()), 'minValue': lambda: min(obj.values()),
             'averageValue': lambda: (lambda r: int(r) if r == int(r) else r)(sum(obj.values()) / len(obj)),
+            'toProperties': lambda: '\n'.join(f"{k}={silk_repr(v)}" for k, v in obj.items()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -273,7 +274,7 @@ class MemberMixin:
             'difference': lambda a: [x for x in obj if x not in a[0]],
             'intersection': lambda a: [x for x in obj if x in a[0]],
             'zip': lambda a: [[x, y] for x, y in zip(obj, a[0])],
-            'sample': lambda a: random.sample(list(obj), min(int(a[0]), len(obj))),
+            'sample': lambda a: random.sample(list(obj), min(int(a[0]), len(obj))), 'takeRandom': lambda a: random.sample(list(obj), min(int(a[0]), len(obj))),
             'dotProduct': lambda a: sum(x * y for x, y in zip(obj, a[0])),
             'zipWith': lambda a: [self._call_function(a[1], [x, y]) for x, y in zip(obj, a[0])],
             'windows': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)], 'aperture': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)],
@@ -490,6 +491,7 @@ class MemberMixin:
             'isSnakeCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9_]*$', obj)) and '__' not in obj,
             'isKebabCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9\-]*$', obj)) and '--' not in obj,
             'squeezeBlanks': lambda: __import__('re').sub(r'\n{3,}', '\n\n', obj),
+            'removeVowels': lambda: ''.join(c for c in obj if c.lower() not in 'aeiou'),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -680,6 +682,7 @@ class MemberMixin:
             'catalan': lambda: math.factorial(2 * int(obj)) // (math.factorial(int(obj) + 1) * math.factorial(int(obj))),
             'bell': lambda: __import__('functools').reduce(lambda r, _: (s := [r[-1]]) and [s.append(s[-1]+v) for v in r] and s, range(int(obj)), [1])[0],
             'derangements': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
+            'motzkin': lambda: __import__('functools').reduce(lambda ab, i: (ab[1], ((2*i+1)*ab[1] + 3*(i-1)*ab[0]) // (i+2)), range(1, int(obj)+1), (1, 1))[1] if int(obj) > 0 else 1,
         }
         if member in _simple:
             fn = _simple[member]
