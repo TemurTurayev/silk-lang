@@ -214,6 +214,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
         if member in ('toXML', 'toYAML', 'toINI'):
             return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{k}{'=' if member == 'toINI' else ': '}{silk_repr(v)}" for k, v in obj.items()))
+        if member == 'toDotNotation':
+            return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -404,7 +406,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
-        if member == 'pairMap':
+        if member in ('pairMap', 'mapPairs'):
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i], obj[i+1]]) for i in range(len(obj) - 1)])
         if member == 'runLengthEncode':
             return ('builtin', lambda args, ctx: [[k, sum(1 for _ in g)] for k, g in __import__('itertools').groupby(obj)] if obj else [])
@@ -457,6 +459,7 @@ class MemberMixin:
             'isAscii': lambda: all(ord(c) < 128 for c in obj),
             'toHashCode': lambda: hash(obj),
             'isDate': lambda: bool(__import__('re').match(r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$', obj)),
+            'toSentenceCase': lambda: obj[0].upper() + obj[1:].lower() if obj else '',
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -547,11 +550,7 @@ class MemberMixin:
         if member == 'partition':
             return ('builtin', lambda args, ctx: list(obj.partition(args[0])))
         if member in ('commonPrefix', 'commonSuffix'):
-            def _cp(args, ctx):
-                a, b = (obj, args[0]) if member == 'commonPrefix' else (obj[::-1], args[0][::-1])
-                i = next((i for i in range(min(len(a), len(b))) if a[i] != b[i]), min(len(a), len(b)))
-                return obj[:i] if member == 'commonPrefix' else (obj[len(obj)-i:] if i else '')
-            return ('builtin', _cp)
+            return ('builtin', lambda args, ctx: (lambda p: (lambda a, b, i: obj[:i] if member == 'commonPrefix' else (obj[len(obj)-i:] if i else ''))(p[0], p[1], next((i for i in range(min(len(p[0]), len(p[1]))) if p[0][i] != p[1][i]), min(len(p[0]), len(p[1])))))((obj, args[0]) if member == 'commonPrefix' else (obj[::-1], args[0][::-1])))
         if member == 'levenshtein':
             def _lev(args, ctx):
                 o, m, n = args[0], len(obj), len(args[0])
@@ -672,6 +671,7 @@ class MemberMixin:
             'isUntouchable': lambda: (lambda n: not any(sum(i for i in range(1, k) if k % i == 0) == n for k in range(2, 2*n+2)))(int(obj)),
             'isSphenic': lambda: (lambda n, pf: len(pf) == 3 and len(set(pf)) == 3)((n := int(obj)), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
             'isSemiPrime': lambda: (lambda pf: len(pf) == 2)((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
+            'isEmirp': lambda: (lambda n, ip: ip(n) and (r := int(str(n)[::-1])) != n and ip(r))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1))),
         }
         if member in _simple:
             fn = _simple[member]
