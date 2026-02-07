@@ -188,6 +188,8 @@ class MemberMixin:
                     return [y for k, v in d.items() for y in (_p(v, f"{pfx}.{k}" if pfx else k) if isinstance(v, dict) else [f"{pfx}.{k}" if pfx else k])]
                 return _p(obj)
             return ('builtin', _ps)
+        if member == 'toCSV':
+            return ('builtin', lambda args, ctx: ','.join(str(k) for k in obj.keys()) + '\n' + ','.join(str(v) for v in obj.values()))
         if member == 'updateIn':
             return ('builtin', lambda args, ctx: {k: (self._call_function(args[1], [v]) if k == args[0] else v) for k, v in obj.items()})
         if member == 'keysByValue':
@@ -245,6 +247,7 @@ class MemberMixin:
             'windows': lambda a: [obj[i:i+int(a[0])] for i in range(len(obj) - int(a[0]) + 1)],
             'splitAt': lambda a: [obj[:int(a[0])], obj[int(a[0]):]],
             'cycle': lambda a: obj * int(a[0]),
+            'takeRight': lambda a: obj[-int(a[0]):] if int(a[0]) > 0 else [],
             'intersperse': lambda a: [x for i, v in enumerate(obj) for x in (([a[0], v] if i > 0 else [v]))],
         }
         if member in _onearg:
@@ -364,9 +367,7 @@ class MemberMixin:
         if member == 'union':
             return ('builtin', lambda args, ctx: list(dict.fromkeys(obj + args[0])))
         if member == 'shuffle':
-            def _sh(args, ctx):
-                c = list(obj); random.shuffle(c); return c
-            return ('builtin', _sh)
+            return ('builtin', lambda args, ctx: random.sample(obj, len(obj)))
         if member == 'forEachIndexed':
             def _fei(args, ctx):
                 for i, x in enumerate(obj): self._call_function(args[0], [i, x])
@@ -498,6 +499,7 @@ class MemberMixin:
             'reverseWords': lambda: ' '.join(obj.split()[::-1]),
             'trimLines': lambda: '\n'.join(l.strip() for l in obj.split('\n')),
             'removeDuplicateChars': lambda: ''.join(obj[i] for i in range(len(obj)) if i == 0 or obj[i] != obj[i-1]),
+            'toAcronym': lambda: ''.join(w[0].upper() for w in obj.split() if w),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -674,6 +676,7 @@ class MemberMixin:
             'isAutomorphic': lambda: str(int(obj) ** 2).endswith(str(int(obj))),
             'toBits': lambda: [int(b) for b in bin(int(obj))[2:]],
             'isKaprekar': lambda: (lambda n, sq: any(int(str(sq)[:i]) + int(str(sq)[i:]) == n for i in range(1, len(str(sq)))) if n > 0 else False)(int(obj), int(obj) ** 2),
+            'cubeRoot': lambda: (lambda r: int(r) if r == int(r) else r)(round(obj ** (1/3), 10)),
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
         }
         if member in _simple:
