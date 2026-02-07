@@ -99,6 +99,7 @@ class MemberMixin:
             'toFormattedString': lambda: ', '.join(f"{k}: {silk_repr(v)}" for k, v in obj.items()),
             'sumValues': lambda: sum(obj.values()),
             'maxValue': lambda: max(obj.values()), 'minValue': lambda: min(obj.values()),
+            'averageValue': lambda: (lambda r: int(r) if r == int(r) else r)(sum(obj.values()) / len(obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -326,15 +327,11 @@ class MemberMixin:
         if member in ('tally', 'frequencies'):
             return ('builtin', lambda args, ctx: (lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({}))
         if member == 'interleave':
-            def _il(args, ctx):
-                return [x for i in range(max(len(obj), len(args[0]))) for x in ([obj[i]] if i < len(obj) else []) + ([args[0][i]] if i < len(args[0]) else [])]
-            return ('builtin', _il)
+            return ('builtin', lambda args, ctx: [x for i in range(max(len(obj), len(args[0]))) for x in ([obj[i]] if i < len(obj) else []) + ([args[0][i]] if i < len(args[0]) else [])])
+        if member == 'interleaveAll':
+            return ('builtin', lambda args, ctx: (lambda arrs: [arrs[j][i] for i in range(max(len(a) for a in arrs)) for j in range(len(arrs)) if i < len(arrs[j])])([obj] + list(args)))
         if member == 'flatten':
-            def _fl(args, ctx):
-                def _f(a, d):
-                    return [x for i in a for x in (_f(i, d-1) if isinstance(i, list) and d > 0 else [i])]
-                return _f(obj, int(args[0]) if args else 1)
-            return ('builtin', _fl)
+            return ('builtin', lambda args, ctx: (f := lambda a, d: [x for i in a for x in (f(i, d-1) if isinstance(i, list) and d > 0 else [i])])(obj, int(args[0]) if args else 1))
         if member == 'takeWhile':
             return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda x: self._call_function(args[0], [x]), obj)))
         if member in ('skipWhile', 'dropWhile'):
@@ -504,6 +501,7 @@ class MemberMixin:
             'countWords': lambda a: obj.split().count(a[0]),
             'isAnagram': lambda a: sorted(obj.lower().replace(' ', '')) == sorted(a[0].lower().replace(' ', '')),
             'indent': lambda a: '\n'.join(' ' * int(a[0]) + l for l in obj.split('\n')),
+            'surround': lambda a: a[0] + obj + a[0],
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -676,6 +674,7 @@ class MemberMixin:
             'isSquare': lambda: int(obj) >= 0 and int(obj ** 0.5) ** 2 == int(obj),
             'isCube': lambda: round(abs(int(obj)) ** (1/3)) ** 3 == abs(int(obj)),
             'isMersennePrime': lambda: (lambda n: n > 1 and (n + 1) & n == 0 and all(n % i for i in range(2, int(n**0.5) + 1)))(int(obj)),
+            'isTriangular': lambda: (lambda n: int((8*n+1)**0.5)**2 == 8*n+1)(int(obj)),
         }
         if member in _simple:
             fn = _simple[member]
