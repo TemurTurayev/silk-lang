@@ -212,8 +212,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda d, k: d.get(k) if isinstance(d, dict) else None, args[0].split('.'), obj))
         if member == 'deepSet':
             return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
-        if member in ('toXML', 'toYAML', 'toINI'):
-            return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{k}{'=' if member == 'toINI' else ': '}{silk_repr(v)}" for k, v in obj.items()))
+        if member in ('toXML', 'toYAML', 'toINI', 'toEnvironment'):
+            return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{'export ' if member == 'toEnvironment' else ''}{k}{'=' if member in ('toINI', 'toEnvironment') else ': '}{silk_repr(v)}" for k, v in obj.items()))
         if member in ('toDotNotation', 'fromDotNotation'):
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
@@ -245,6 +245,7 @@ class MemberMixin:
             'maxIndex': lambda: obj.index(max(obj)), 'minIndex': lambda: obj.index(min(obj)),
             'accumulate': lambda: list(__import__('itertools').accumulate(obj)),
             'adjacentDiff': lambda: [obj[i+1] - obj[i] for i in range(len(obj) - 1)],
+            'runningAverage': lambda: [(lambda s: int(s) if s == int(s) else s)(sum(obj[:i+1]) / (i+1)) for i in range(len(obj))],
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -585,7 +586,7 @@ class MemberMixin:
                 m = min((len(l) - len(l.lstrip()) for l in ls if l.strip()), default=0)
                 return '\n'.join(l[m:] for l in ls)
             return ('builtin', _dd)
-        if member == 'slugify':
+        if member in ('slugify', 'toTitleSlug'):
             import re as _re; return ('builtin', lambda args, ctx: _re.sub(r'-+', '-', _re.sub(r'[^a-z0-9]+', '-', obj.lower())).strip('-'))
         if member == 'isJSON':
             def _ij(args, ctx):
@@ -714,9 +715,9 @@ class MemberMixin:
                     while n >= v: r += s; n -= v
                 return r
             return ('builtin', _rm)
-        if member == 'fibonacci':
+        if member in ('fibonacci', 'lucasNumber'):
             def _fib(args, ctx):
-                a, b = 0, 1
+                a, b = (0, 1) if member == 'fibonacci' else (2, 1)
                 for _ in range(int(obj)): a, b = b, a + b
                 return a
             return ('builtin', _fib)
