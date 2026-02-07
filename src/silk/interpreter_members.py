@@ -181,11 +181,7 @@ class MemberMixin:
         if member in ('countValues', 'valueCounts'):
             return ('builtin', lambda args, ctx: (lambda c: [c.update({v: c.get(v, 0) + 1}) for v in obj.values()] and c or c)({}))
         if member == 'paths':
-            def _ps(args, ctx):
-                def _p(d, pfx=''):
-                    return [y for k, v in d.items() for y in (_p(v, f"{pfx}.{k}" if pfx else k) if isinstance(v, dict) else [f"{pfx}.{k}" if pfx else k])]
-                return _p(obj)
-            return ('builtin', _ps)
+            return ('builtin', lambda args, ctx: (p := lambda d, pfx='': [y for k, v in d.items() for y in (p(v, f"{pfx}.{k}" if pfx else k) if isinstance(v, dict) else [f"{pfx}.{k}" if pfx else k])])(obj))
         if member == 'toCSV':
             return ('builtin', lambda args, ctx: ','.join(str(k) for k in obj.keys()) + '\n' + ','.join(str(v) for v in obj.values()))
         if member == 'updateIn':
@@ -412,8 +408,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i], obj[i+1]]) for i in range(len(obj) - 1)])
         if member == 'runLengthEncode':
             return ('builtin', lambda args, ctx: [[k, sum(1 for _ in g)] for k, g in __import__('itertools').groupby(obj)] if obj else [])
-        if member == 'mapAccum':
-            return ('builtin', lambda args, ctx: (lambda: (r := [[], args[1]]) and [r.__setitem__(1, (p := self._call_function(args[0], [r[1], x]))[1]) or r[0].append(p[0]) for x in obj] and r)())
+        if member in ('mapAccum', 'mapAccumRight'):
+            return ('builtin', lambda args, ctx: (lambda: (r := [[], args[1]]) and [r.__setitem__(1, (p := self._call_function(args[0], [r[1], x]))[1]) or r[0].append(p[0]) for x in (reversed(obj) if member == 'mapAccumRight' else obj)] and ([r[0][::-1], r[1]] if member == 'mapAccumRight' else r))())
         if member in ('foldRight', 'reduceRight'):
             def _fr(args, ctx):
                 acc = args[1]
@@ -535,12 +531,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: __import__('re').sub(r' {2,}', ' ', obj))
         if member == 'at':
             return ('builtin', lambda args, ctx: obj[int(args[0])] if -len(obj) <= int(args[0]) < len(obj) else None)
-        if member in ('camelCase', 'snakeCase', 'kebabCase', 'titleCase', 'toPascalCase', 'toConstantCase'):
+        if member in ('camelCase', 'snakeCase', 'kebabCase', 'titleCase', 'toPascalCase', 'toConstantCase', 'toDotCase'):
             def _cc(args, ctx, _re=__import__('re')):
                 p = _re.split(r'[-_\s]+', obj)
                 if member == 'camelCase': return p[0].lower() + ''.join(w.capitalize() for w in p[1:])
                 if member in ('titleCase', 'toPascalCase'): return (' ' if member == 'titleCase' else '').join(w.capitalize() for w in p)
-                sep = '_' if member in ('snakeCase', 'toConstantCase') else '-'
+                sep = '_' if member in ('snakeCase', 'toConstantCase') else ('.' if member == 'toDotCase' else '-')
                 r = _re.sub(r'([a-z])([A-Z])', r'\1' + sep + r'\2', _re.sub(r'[-_\s]+', sep, obj))
                 return r.upper() if member == 'toConstantCase' else r.lower()
             return ('builtin', _cc)
@@ -610,6 +606,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: __import__('re').findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', obj))
         if member == 'extractUrls':
             return ('builtin', lambda args, ctx: __import__('re').findall(r'https?://[^\s]+', obj))
+        if member == 'parseXML':
+            return ('builtin', lambda args, ctx: dict(__import__('re').findall(r'<(\w+)>([^<]*)</\1>', obj)))
         if member == 'wordFrequency':
             return ('builtin', lambda args, ctx: (lambda f: [f.update({w: f.get(w, 0) + 1}) for w in obj.split()] and f or f)({}) if obj.strip() else {})
         if member == 'isBalanced':
@@ -671,6 +669,7 @@ class MemberMixin:
             'reverseDigits': lambda: int(str(abs(int(obj)))[::-1]) * (1 if int(obj) >= 0 else -1),
             'isSmith': lambda: (lambda n, ds, pf: n > 1 and not all(n % i for i in range(2, int(n**0.5)+1)) and ds(n) == sum(ds(p) for p in pf(n)))(int(obj), lambda x: sum(int(d) for d in str(x)), lambda n: (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
             'abundantBy': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj),
+            'isUntouchable': lambda: (lambda n: not any(sum(i for i in range(1, k) if k % i == 0) == n for k in range(2, 2*n+2)))(int(obj)),
         }
         if member in _simple:
             fn = _simple[member]
