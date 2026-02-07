@@ -206,6 +206,8 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
+        if member == 'toTOML':
+            return ('builtin', lambda args, ctx: '\n'.join(f'{k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)}' for k, v in obj.items()))
         if member == 'toGraphQL':
             return ('builtin', lambda args, ctx: '{ ' + ', '.join(f'{k}: {silk_repr(v)}' for k, v in obj.items()) + ' }')
         if member == 'toSwiftDict':
@@ -412,6 +414,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
             return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member == 'forEachRight':
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in reversed(obj)] and None)
         if member == 'mapWhileIndexed':
             return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda v: v is not False, (self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))))
         if member == 'noneIndexed':
@@ -499,6 +503,7 @@ class MemberMixin:
             'toCamelWords': lambda: __import__('re').sub(r'([a-z])([A-Z])', r'\1_\2', obj).split('_'),
             'toWordArray': lambda: obj.split(),
             'charCount': lambda: len(set(obj)),
+            'encodeURI': lambda: __import__('urllib.parse', fromlist=['quote']).quote(obj, safe=''),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -688,6 +693,7 @@ class MemberMixin:
             'tetrahedral': lambda: int(obj) * (int(obj) + 1) * (int(obj) + 2) // 6,
             'pyramidal': lambda: int(obj) * (int(obj) + 1) * (2 * int(obj) + 1) // 6,
             'star': lambda: 6 * int(obj) * (int(obj) - 1) + 1,
+            'oblong': lambda: int(obj) * (int(obj) + 1),
         }
         if member in _simple:
             fn = _simple[member]
@@ -740,15 +746,9 @@ class MemberMixin:
             def _tw(args, ctx, _o=['','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'], _t=['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']):
                 n = int(obj)
                 if n == 0: return 'zero'
-                def _ch(num):
-                    if num == 0: return ''
-                    if num < 20: return _o[num]
-                    if num < 100: return _t[num // 10] + ('-' + _o[num % 10] if num % 10 else '')
-                    return _o[num // 100] + ' hundred' + (' ' + _ch(num % 100) if num % 100 else '')
-                p, s, i, rem = [], ['', ' thousand', ' million', ' billion'], 0, abs(n)
-                while rem > 0:
-                    if rem % 1000: p.append(_ch(rem % 1000) + s[i])
-                    rem //= 1000; i += 1
+                _ch = lambda num: '' if num == 0 else _o[num] if num < 20 else (_t[num // 10] + ('-' + _o[num % 10] if num % 10 else '')) if num < 100 else _o[num // 100] + ' hundred' + (' ' + _ch(num % 100) if num % 100 else '')
+                p, s, rem = [], ['', ' thousand', ' million', ' billion'], abs(n)
+                while rem > 0: (p.append(_ch(rem % 1000) + s[len(p)]) if rem % 1000 else None); rem //= 1000
                 return ('negative ' if n < 0 else '') + ' '.join(reversed(p))
             return ('builtin', _tw)
         if member in ('collatz', 'collatzSequence'):
