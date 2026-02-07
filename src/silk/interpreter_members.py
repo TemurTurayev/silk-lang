@@ -215,6 +215,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: {self._call_function(args[0], [k]): self._call_function(args[1], [v]) for k, v in obj.items()})
         if member == 'mapToArray':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [k, v]) for k, v in obj.items()])
+        if member == 'toPrettyString':
+            return ('builtin', lambda args, ctx: '{\n' + ',\n'.join(f'  {silk_repr(k)}: {silk_repr(v)}' for k, v in obj.items()) + '\n}')
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
         raise RuntimeError_(f"'dict' has no member '{member}'")
@@ -276,6 +278,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj.index(args[0]) if args[0] in obj else -1)
         if member == 'map':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [item]) for item in obj])
+        if member == 'mapNotNull':
+            return ('builtin', lambda args, ctx: [r for item in obj if (r := self._call_function(args[0], [item])) is not None])
         if member == 'filter':
             return ('builtin', lambda args, ctx: [item for item in obj if self._call_function(args[0], [item])])
         if member == 'forEach':
@@ -406,23 +410,9 @@ class MemberMixin:
         if member == 'span':
             return ('builtin', lambda args, ctx: (lambda i: [obj[:i], obj[i:]])(next((i for i, x in enumerate(obj) if not self._call_function(args[0], [x])), len(obj))))
         if member == 'mapWhile':
-            def _mw(args, ctx):
-                r = []
-                for x in obj:
-                    v = self._call_function(args[0], [x])
-                    if v is False: break
-                    r.append(v)
-                return r
-            return ('builtin', _mw)
+            return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda v: v is not False, (self._call_function(args[0], [x]) for x in obj))))
         if member == 'groupConsecutive':
-            def _gc(args, ctx):
-                if not obj: return []
-                r, g = [], [obj[0]]
-                for x in obj[1:]:
-                    if x == g[-1]: g.append(x)
-                    else: r.append(g); g = [x]
-                return r + [g]
-            return ('builtin', _gc)
+            return ('builtin', lambda args, ctx: [list(g) for _, g in __import__('itertools').groupby(obj)] if obj else [])
         if member in ('mapFirst', 'mapLast'):
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
         if member in ('minBy', 'maxBy'):
@@ -479,6 +469,7 @@ class MemberMixin:
             'toAcronym': lambda: ''.join(w[0].upper() for w in obj.split() if w),
             'sizeInBytes': lambda: len(obj.encode('utf-8')),
             'isWhitespace': lambda: len(obj) > 0 and obj.isspace(),
+            'isHex': lambda: len(obj) > 0 and all(c in '0123456789abcdefABCDEF' for c in obj),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -675,6 +666,7 @@ class MemberMixin:
             'isMersennePrime': lambda: (lambda n: n > 1 and (n + 1) & n == 0 and all(n % i for i in range(2, int(n**0.5) + 1)))(int(obj)),
             'isTriangular': lambda: (lambda n: int((8*n+1)**0.5)**2 == 8*n+1)(int(obj)),
             'totient': lambda: sum(1 for i in range(1, int(obj) + 1) if math.gcd(i, int(obj)) == 1),
+            'harmonicSum': lambda: (lambda r: int(r) if r == int(r) else r)(sum(1/i for i in range(1, int(obj) + 1))),
         }
         if member in _simple:
             fn = _simple[member]
