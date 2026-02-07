@@ -243,7 +243,7 @@ class MemberMixin:
             'zipWithIndex': lambda: [[v, i] for i, v in enumerate(obj)],
             'unzip': lambda: [list(t) for t in zip(*obj)] if obj else [],
             'maxIndex': lambda: obj.index(max(obj)), 'minIndex': lambda: obj.index(min(obj)),
-            'accumulate': lambda: list(__import__('itertools').accumulate(obj)),
+            'accumulate': lambda: list(__import__('itertools').accumulate(obj)), 'cumulativeSum': lambda: list(__import__('itertools').accumulate(obj)),
             'adjacentDiff': lambda: [obj[i+1] - obj[i] for i in range(len(obj) - 1)],
             'runningAverage': lambda: [(lambda s: int(s) if s == int(s) else s)(sum(obj[:i+1]) / (i+1)) for i in range(len(obj))],
         }
@@ -416,6 +416,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [[k, sum(1 for _ in g)] for k, g in __import__('itertools').groupby(obj)] if obj else [])
         if member in ('mapAccum', 'mapAccumRight'):
             return ('builtin', lambda args, ctx: (lambda: (r := [[], args[1]]) and [r.__setitem__(1, (p := self._call_function(args[0], [r[1], x]))[1]) or r[0].append(p[0]) for x in (reversed(obj) if member == 'mapAccumRight' else obj)] and ([r[0][::-1], r[1]] if member == 'mapAccumRight' else r))())
+        if member == 'toDict':
+            return ('builtin', lambda args, ctx: dict(zip(obj, args[0])))
         if member in ('foldRight', 'reduceRight'):
             def _fr(args, ctx):
                 acc = args[1]
@@ -465,6 +467,7 @@ class MemberMixin:
             'isDate': lambda: bool(__import__('re').match(r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$', obj)),
             'toSentenceCase': lambda: obj[0].upper() + obj[1:].lower() if obj else '',
             'isPhoneNumber': lambda: bool(__import__('re').match(r'^[\+]?[\d\s\-\(\)]{7,}$', obj)),
+            'countVowels': lambda: sum(1 for c in obj.lower() if c in 'aeiou'),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -565,15 +568,7 @@ class MemberMixin:
         if member == 'hamming':
             return ('builtin', lambda args, ctx: sum(a != b for a, b in zip(obj, args[0])))
         if member == 'soundex':
-            def _sx(args, ctx, _c={c: d for d, cs in enumerate('AEIOUYHW,BFPV,CGJKQSXZ,DT,L,MN,R'.split(',')) for c in cs}):
-                if not obj: return ''
-                r, p = obj[0].upper(), _c.get(obj[0].upper(), 0)
-                for ch in obj[1:]:
-                    cd = _c.get(ch.upper(), 0)
-                    if cd > 0 and cd != p: r += str(cd)
-                    p = cd or p
-                return (r + '000')[:4]
-            return ('builtin', _sx)
+            return ('builtin', lambda args, ctx, _c={c: d for d, cs in enumerate('AEIOUYHW,BFPV,CGJKQSXZ,DT,L,MN,R'.split(',')) for c in cs}: '' if not obj else (__import__('functools').reduce(lambda rp, ch: ((rp[0]+str(cd), cd or rp[1]) if (cd := _c.get(ch.upper(), 0)) > 0 and cd != rp[1] else (rp[0], cd or rp[1])), obj[1:], (obj[0].upper(), _c.get(obj[0].upper(), 0)))[0] + '000')[:4])
         if member == 'isUrl':
             return ('builtin', lambda args, ctx: obj.startswith(('http://', 'https://')) and '.' in obj.split('//')[1])
         if member == 'caesar':
@@ -715,8 +710,12 @@ class MemberMixin:
                     while n >= v: r += s; n -= v
                 return r
             return ('builtin', _rm)
-        if member in ('fibonacci', 'lucasNumber'):
+        if member in ('fibonacci', 'lucasNumber', 'tribonacci'):
             def _fib(args, ctx):
+                if member == 'tribonacci':
+                    a, b, c = 0, 1, 1
+                    for _ in range(int(obj)): a, b, c = b, c, a + b + c
+                    return a
                 a, b = (0, 1) if member == 'fibonacci' else (2, 1)
                 for _ in range(int(obj)): a, b = b, a + b
                 return a
