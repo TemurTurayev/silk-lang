@@ -215,8 +215,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: '| ' + ' | '.join(str(k) for k in obj.keys()) + ' |\n| ' + ' | '.join('---' for _ in obj) + ' |\n| ' + ' | '.join(silk_repr(v) for v in obj.values()) + ' |')
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
-        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig', 'toTerraformHCL', 'toHelmValues', 'toVaultPolicy', 'toNomadJob'):
-            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' ', 'toTerraformHCL': ' = ', 'toHelmValues': ': ', 'toVaultPolicy': ' = ', 'toNomadJob': ' = '}[member]
+        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig', 'toTerraformHCL', 'toHelmValues', 'toVaultPolicy', 'toNomadJob', 'toPrometheusConfig'):
+            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' ', 'toTerraformHCL': ' = ', 'toHelmValues': ': ', 'toVaultPolicy': ' = ', 'toNomadJob': ' = ', 'toPrometheusConfig': ' = '}[member]
             _end = ';' if member == 'toNginxConfig' else ''
             return ('builtin', lambda args, ctx, s=_sep, e=_end: '\n'.join(f'{k}{s}{json.dumps(v) if isinstance(v, str) else silk_repr(v)}{e}' for k, v in obj.items()))
         if member in ('toTypeScript', 'toGraphQLSchema'):
@@ -316,14 +316,11 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj), int(args[0]))])
         if member in ('window', 'windowed'):
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(len(obj) - int(args[0]) + 1)])
-        if member == 'rotate':
-            return ('builtin', lambda args, ctx: (lambda n: obj[-n:] + obj[:-n] if n else list(obj))(int(args[0]) % len(obj)) if obj else [])
+        if member == 'rotate': return ('builtin', lambda args, ctx: (lambda n: obj[-n:] + obj[:-n] if n else list(obj))(int(args[0]) % len(obj)) if obj else [])
         if member == 'partition':
             return ('builtin', lambda args, ctx: (lambda y, n: [(y if self._call_function(args[0], [x]) else n).append(x) for x in obj] and [y, n] or [y, n])([], []))
-        if member == 'findLast':
-            return ('builtin', lambda args, ctx: next((x for x in reversed(obj) if self._call_function(args[0], [x])), None))
-        if member == 'findLastIndex':
-            return ('builtin', lambda args, ctx: next((i for i in range(len(obj)-1, -1, -1) if self._call_function(args[0], [obj[i]])), -1))
+        if member == 'findLast': return ('builtin', lambda args, ctx: next((x for x in reversed(obj) if self._call_function(args[0], [x])), None))
+        if member == 'findLastIndex': return ('builtin', lambda args, ctx: next((i for i in range(len(obj)-1, -1, -1) if self._call_function(args[0], [obj[i]])), -1))
         if member in ('tally', 'frequencies', 'histogram'):
             return ('builtin', lambda args, ctx: (lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({}))
         if member == 'interleave':
@@ -445,6 +442,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [s.append(self._call_function(args[1], [s[-1], x])) for x in obj] and s[1:])())
         if member == 'foldMap':
             return ('builtin', lambda args, ctx: sum(self._call_function(args[0], [x]) for x in obj))
+        if member == 'mapZip':
+            return ('builtin', lambda args, ctx: [self._call_function(args[1], [a, b]) for a, b in zip(obj, args[0])])
         if member == 'mapWithLast':
             return ('builtin', lambda args, ctx: (lambda: (r := [obj[0]]) and [r.append(self._call_function(args[0], [obj[i], r[-1]])) for i in range(1, len(obj))] and r)())
         if member in ('mapUntil', 'mapAdjacent', 'mapChunked'):
@@ -510,7 +509,7 @@ class MemberMixin:
             'toTapCode': lambda: ' '.join((lambda p: f'{p//5+1},{p%5+1}')((lambda c: ord(c)-ord('a') if c < 'k' else ord(c)-ord('a')-1)(c)) for c in obj.lower().replace('k','c') if c.isalpha()),
             'toPolybius': lambda: ' '.join((lambda p: f'{p//5+1}{p%5+1}')((lambda c: ord(c)-ord('a') if c < 'k' else ord(c)-ord('a')-1)(c)) for c in obj.lower().replace('k','c') if c.isalpha()),
             'toBacon': lambda: ' '.join(bin(ord(c) - ord('a'))[2:].zfill(5).replace('0', 'A').replace('1', 'B') for c in obj.lower() if c.isalpha()),
-            'toSemaphore': lambda: ' '.join(str(ord(c) - ord('a') + 1) for c in obj.lower() if c.isalpha()),
+            'toSemaphore': lambda: ' '.join(str(ord(c) - ord('a') + 1) for c in obj.lower() if c.isalpha()), 'toASCIIArt': lambda: ' '.join(str(ord(c)) for c in obj),
         }
         if member == 'toMorse': member = 'toMorseCode'
         if member in _noarg:
@@ -693,6 +692,7 @@ class MemberMixin:
             'isHumble': lambda: (lambda n, pf: n >= 1 and all(p in (2,3,5,7) for p in set(pf)))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
             'isSophieGermain': lambda: (lambda n, ip: ip(n) and ip(2*n+1))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1))),
             'isChen': lambda: (lambda n, ip, isp: ip(n) and (ip(n+2) or isp(n+2)))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)), lambda n: len((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)) == 2),
+            'isWasteful': lambda: (lambda n, pf: sum(len(str(p)) for p in pf) > len(str(n)))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
         }
         if member in _simple:
             fn = _simple[member]
