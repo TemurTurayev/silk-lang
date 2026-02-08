@@ -223,7 +223,7 @@ class MemberMixin:
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
         if member == 'toKafkaConfig': member = 'toZookeeperConfig'
-        if member in ('toRabbitmqConfig', 'toElasticConfig', 'toMysqlConfig', 'toMongoConfig', 'toCouchDBConfig', 'toInfluxDBConfig', 'toNeo4jConfig', 'toCassandraConfig', 'toClickHouseConfig', 'toTimescaleDBConfig'): member = {'toRabbitmqConfig': 'toGrafanaConfig', 'toElasticConfig': 'toConsulKV', 'toMysqlConfig': 'toGrafanaConfig', 'toMongoConfig': 'toConsulKV', 'toCouchDBConfig': 'toGrafanaConfig', 'toInfluxDBConfig': 'toGrafanaConfig', 'toNeo4jConfig': 'toZookeeperConfig', 'toCassandraConfig': 'toConsulKV', 'toClickHouseConfig': 'toGrafanaConfig', 'toTimescaleDBConfig': 'toPostgresConfig'}[member]
+        if member in ('toRabbitmqConfig', 'toElasticConfig', 'toMysqlConfig', 'toMongoConfig', 'toCouchDBConfig', 'toInfluxDBConfig', 'toNeo4jConfig', 'toCassandraConfig', 'toClickHouseConfig', 'toTimescaleDBConfig', 'toDynamoDBConfig'): member = {'toRabbitmqConfig': 'toGrafanaConfig', 'toElasticConfig': 'toConsulKV', 'toMysqlConfig': 'toGrafanaConfig', 'toMongoConfig': 'toConsulKV', 'toCouchDBConfig': 'toGrafanaConfig', 'toInfluxDBConfig': 'toGrafanaConfig', 'toNeo4jConfig': 'toZookeeperConfig', 'toCassandraConfig': 'toConsulKV', 'toClickHouseConfig': 'toGrafanaConfig', 'toTimescaleDBConfig': 'toPostgresConfig', 'toDynamoDBConfig': 'toGrafanaConfig'}[member]
         if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream', 'toFluentBitConfig', 'toLogstashConfig', 'toSentinelConfig', 'toHAProxyConfig', 'toVarnishConfig', 'toEnvoyConfig', 'toTraefikConfig', 'toCaddyConfig', 'toZookeeperConfig', 'toMemcachedConfig', 'toPostgresConfig', 'toRedisClusterConfig'):
             _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};', 'toFluentBitConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toLogstashConfig': lambda k, v: f'{k} => {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toSentinelConfig': lambda k, v: f'sentinel {k} {v if isinstance(v, str) else silk_repr(v)}', 'toHAProxyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toVarnishConfig': lambda k, v: f'set {k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)};', 'toEnvoyConfig': lambda k, v: f'{k}: {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toTraefikConfig': lambda k, v: f'[{k}]\n  value = {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toCaddyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toZookeeperConfig': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toMemcachedConfig': lambda k, v: f'-{k} {v if isinstance(v, str) else silk_repr(v)}', 'toPostgresConfig': lambda k, v: f"{k} = '{v}'" if isinstance(v, str) else f'{k} = {silk_repr(v)}', 'toRedisClusterConfig': lambda k, v: f'cluster-{k} {v if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
@@ -242,7 +242,7 @@ class MemberMixin:
             'isEmpty': lambda: len(obj) == 0, 'compact': lambda: [x for x in obj if x is not None],
             'enumerate': lambda: [[i, v] for i, v in enumerate(obj)],
             'pairwise': lambda: [[obj[i], obj[i + 1]] for i in range(len(obj) - 1)],
-            'prefixes': lambda: [obj[:i+1] for i in range(len(obj))],
+            'prefixes': lambda: [obj[:i+1] for i in range(len(obj))], 'mapHeads': lambda: [obj[:i+1] for i in range(len(obj))],
             'suffixes': lambda: [obj[i:] for i in range(len(obj))], 'mapTails': lambda: [obj[i:] for i in range(len(obj))],
             'dedup': lambda: [obj[i] for i in range(len(obj)) if i == 0 or obj[i] != obj[i-1]],
             'adjacentPairs': lambda: [[obj[i], obj[i+1]] for i in range(len(obj) - 1)], 'slidingPairs': lambda: [[obj[i], obj[i+1]] for i in range(len(obj) - 1)],
@@ -331,11 +331,7 @@ class MemberMixin:
         if member == 'takeWhile': return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda x: self._call_function(args[0], [x]), obj)))
         if member in ('skipWhile', 'dropWhile'): return ('builtin', lambda args, ctx: list(__import__('itertools').dropwhile(lambda x: self._call_function(args[0], [x]), obj)))
         if member in ('scan', 'scanRight'):
-            def _scan(args, ctx):
-                r, acc, items = [], args[1], (reversed(obj) if member == 'scanRight' else obj)
-                for x in items: acc = self._call_function(args[0], [acc, x]); r.append(acc)
-                return r[::-1] if member == 'scanRight' else r
-            return ('builtin', _scan)
+            return ('builtin', lambda args, ctx: (lambda r, items: [r.append(self._call_function(args[0], [r[-1], x])) or None for x in items] and (r[1:][::-1] if member == 'scanRight' else r[1:]))([args[1]], reversed(obj) if member == 'scanRight' else obj))
         if member == 'product': return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda a, b: a * b, obj, 1))
         if member in ('mapIndexed', 'mapWithIndex'): return ('builtin', lambda args, ctx: [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)])
         if member == 'average': return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)(sum(obj) / len(obj)))
@@ -507,6 +503,7 @@ class MemberMixin:
             'caesarCipher': lambda a: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + int(a[0])) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj),
             'vigenereCipher': lambda a: ''.join(chr((ord(c) - 97 + ord(a[0][i % len(a[0])].lower()) - 97) % 26 + 97) if c.isalpha() else c for i, c in enumerate(obj.lower())),
             'toColumnar': lambda a: ''.join(obj[i::int(a[0])] for i in range(int(a[0]))),
+            'toCenterPad': lambda a: obj.center(int(a[0])),
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -689,6 +686,7 @@ class MemberMixin:
             'isPowerful': lambda: (lambda n: n > 0 and any(n % (b**3) == 0 and int((n//(b**3))**0.5)**2 == n//(b**3) for b in range(1, int(n**(1/3))+2)))(int(obj)),
             'isAchilles': lambda: (lambda n: n > 1 and any(n % (b**3) == 0 and int((n//(b**3))**0.5)**2 == n//(b**3) for b in range(1, int(n**(1/3))+2)) and not any(round(n**(1/k)) ** k == n for k in range(2, int(n.bit_length())+1)))(int(obj)),
             'isTruncatablePrime': lambda: (lambda n: n > 1 and all((lambda m: m > 1 and all(m % i != 0 for i in range(2, int(m**0.5)+1)))(int(str(n)[:i])) for i in range(1, len(str(n))+1)))(int(obj)),
+            'isCircularPrime': lambda: (lambda n, s: n > 1 and all((lambda m: m > 1 and all(m % i != 0 for i in range(2, int(m**0.5)+1)))(int(s[r:] + s[:r])) for r in range(len(s))))(int(obj), str(int(obj))),
         }
         if member == 'isEconomical': member = 'isFrugal'
         if member in _simple:
