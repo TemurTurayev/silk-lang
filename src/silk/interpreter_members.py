@@ -215,6 +215,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: '| ' + ' | '.join(str(k) for k in obj.keys()) + ' |\n| ' + ' | '.join('---' for _ in obj) + ' |\n| ' + ' | '.join(silk_repr(v) for v in obj.values()) + ' |')
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
+        if member == 'toDSL':
+            return ('builtin', lambda args, ctx: '\n'.join(f'{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}' for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -434,7 +436,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, x: self._call_function(args[0], [acc, x]), reversed(obj), args[1]))
         if member == 'reduceWhile':
             return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [((s.__setitem__(0, r) or True) if (r := self._call_function(args[1], [s[0], x])) is not False else None) for x in obj] and s[0])())
-        if member == 'unfold':
+        if member in ('unfold', 'iterate'):
             return ('builtin', lambda args, ctx: (lambda s, fn, n: (r := [s]) and [r.append(fn(r[-1])) for _ in range(n-1)] and r)(args[0], lambda x: self._call_function(args[1], [x]), int(args[2])))
         raise RuntimeError_(f"'list' has no member '{member}'")
 
@@ -502,7 +504,7 @@ class MemberMixin:
             'toBase64': lambda: __import__('base64').b64encode(obj.encode()).decode(),
             'fromBase64': lambda: __import__('base64').b64decode(obj.encode()).decode(),
             'toMd5': lambda: __import__('hashlib').md5(obj.encode()).hexdigest(),
-            'toSha256': lambda: __import__('hashlib').sha256(obj.encode()).hexdigest(), 'toHex': lambda: obj.encode().hex(),
+            'toSha256': lambda: __import__('hashlib').sha256(obj.encode()).hexdigest(), 'toHex': lambda: obj.encode().hex(), 'fromHex': lambda: bytes.fromhex(obj).decode(),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -663,8 +665,7 @@ class MemberMixin:
             'isKaprekar': lambda: (lambda n, sq: any(int(str(sq)[:i]) + int(str(sq)[i:]) == n for i in range(1, len(str(sq)))) if n > 0 else False)(int(obj), int(obj) ** 2),
             'cubeRoot': lambda: (lambda r: int(r) if r == int(r) else r)(round(obj ** (1/3), 10)),
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
-            'isPowerOfTwo': lambda: int(obj) > 0 and (int(obj) & (int(obj) - 1)) == 0,
-            'sumOfSquares': lambda: sum(i * i for i in range(1, int(obj) + 1)),
+            'isPowerOfTwo': lambda: int(obj) > 0 and (int(obj) & (int(obj) - 1)) == 0, 'sumOfSquares': lambda: sum(i * i for i in range(1, int(obj) + 1)),
             'isNarcissistic': lambda: (lambda s, n: sum(int(d) ** n for d in s) == int(obj))(str(abs(int(obj))), len(str(abs(int(obj))))),
             'isSquare': lambda: int(obj) >= 0 and int(obj ** 0.5) ** 2 == int(obj),
             'isCube': lambda: round(abs(int(obj)) ** (1/3)) ** 3 == abs(int(obj)),
@@ -686,15 +687,14 @@ class MemberMixin:
             'bell': lambda: __import__('functools').reduce(lambda r, _: (s := [r[-1]]) and [s.append(s[-1]+v) for v in r] and s, range(int(obj)), [1])[0],
             'derangements': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
             'motzkin': lambda: __import__('functools').reduce(lambda ab, i: (ab[1], ((2*i+1)*ab[1] + 3*(i-1)*ab[0]) // (i+2)), range(1, int(obj)+1), (1, 1))[1] if int(obj) > 0 else 1,
-            'tetrahedral': lambda: int(obj) * (int(obj) + 1) * (int(obj) + 2) // 6,
-            'pyramidal': lambda: int(obj) * (int(obj) + 1) * (2 * int(obj) + 1) // 6,
-            'star': lambda: 6 * int(obj) * (int(obj) - 1) + 1,
+            'tetrahedral': lambda: int(obj) * (int(obj) + 1) * (int(obj) + 2) // 6, 'pyramidal': lambda: int(obj) * (int(obj) + 1) * (2 * int(obj) + 1) // 6, 'star': lambda: 6 * int(obj) * (int(obj) - 1) + 1,
             'oblong': lambda: int(obj) * (int(obj) + 1), 'pronic': lambda: int(obj) * (int(obj) + 1),
             'superFactorial': lambda: __import__('functools').reduce(lambda a, i: a * math.factorial(i), range(1, int(obj) + 1), 1),
             'subfactorial': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
             'doubleFactorial': lambda: __import__('functools').reduce(lambda a, b: a * b, range(int(obj), 0, -2), 1),
             'primorial': lambda: __import__('functools').reduce(lambda a, b: a * b, [p for p in range(2, int(obj)+1) if all(p % i for i in range(2, int(p**0.5)+1))], 1),
             'isLucky': lambda: (lambda n: (s := list(range(1, max(n*2, 10), 2))) and all((s := [s[j] for j in range(len(s)) if (j+1) % s[i] != 0]) or True for i in range(1, len(s)) if i < len(s) and s[i] <= len(s)) and n in s)(int(obj)),
+            'isWieferich': lambda: (lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)) and pow(2, n-1, n*n) == 1)(int(obj)),
         }
         if member in _simple:
             fn = _simple[member]
