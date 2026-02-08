@@ -202,10 +202,10 @@ class MemberMixin:
             if member == 'toDotNotation':
                 return ('builtin', lambda args, ctx: (f := lambda d, pfx='': {y: z for k, v in d.items() for y, z in (f(v, f"{pfx}.{k}" if pfx else k).items() if isinstance(v, dict) else [(f"{pfx}.{k}" if pfx else k, v)])})(obj))
             return ('builtin', lambda args, ctx: (lambda r: [((s := lambda d, keys, v: d.update({keys[0]: s(d.get(keys[0], {}), keys[1:], v)}) or d if len(keys) > 1 else d.update({keys[0]: v}) or d))(r, k.split('.'), v) for k, v in obj.items()] and r)({}))
-        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toKotlinMap', 'toPhpArray', 'toRustStruct', 'toCSharpDict', 'toClojureMap', 'toHaskellMap', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
+        if member in ('toTOML', 'toGraphQL', 'toElixirMap', 'toScalaMap', 'toKotlinMap', 'toPhpArray', 'toRustStruct', 'toCSharpDict', 'toClojureMap', 'toHaskellMap', 'toGoMap', 'toSwiftDict', 'toPythonDict', 'toRubyHash', 'toLuaTable'):
             _qv = lambda v: json.dumps(v) if isinstance(v, str) else silk_repr(v)
-            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toKotlinMap': ('mapOf(', ', ', lambda k, v: f'"{k}" to {_qv(v)}'), 'toPhpArray': ('[', ', ', lambda k, v: f'"{k}" => {_qv(v)}'), 'toRustStruct': ('Data { ', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toCSharpDict': ('{', ', ', lambda k, v: f'{{"{k}", {_qv(v)}}}'), 'toClojureMap': ('{', ', ', lambda k, v: f':{k} {_qv(v)}'), 'toHaskellMap': ('fromList [', ', ', lambda k, v: f'("{k}", {_qv(v)})'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
-            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toKotlinMap': ')', 'toPhpArray': ']', 'toRustStruct': ' }', 'toCSharpDict': '}', 'toClojureMap': '}', 'toHaskellMap': ']', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
+            _m = {'toTOML': (None, '\n', lambda k, v: f'{k} = {_qv(v)}'), 'toGraphQL': ('{ ', ', ', lambda k, v: f'{k}: {silk_repr(v)}'), 'toElixirMap': ('%{', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toScalaMap': ('Map(', ', ', lambda k, v: f'"{k}" -> {_qv(v)}'), 'toKotlinMap': ('mapOf(', ', ', lambda k, v: f'"{k}" to {_qv(v)}'), 'toPhpArray': ('[', ', ', lambda k, v: f'"{k}" => {_qv(v)}'), 'toRustStruct': ('Data { ', ', ', lambda k, v: f'{k}: {_qv(v)}'), 'toCSharpDict': ('{', ', ', lambda k, v: f'{{"{k}", {_qv(v)}}}'), 'toClojureMap': ('{', ', ', lambda k, v: f':{k} {_qv(v)}'), 'toHaskellMap': ('fromList [', ', ', lambda k, v: f'("{k}", {_qv(v)})'), 'toGoMap': ('map[string]interface{}{', ', ', lambda k, v: f'"{k}": {_qv(v)}'), 'toSwiftDict': ('[', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toPythonDict': ('{', ', ', lambda k, v: f'"{k}": {silk_repr(v)}'), 'toRubyHash': ('{', ', ', lambda k, v: f'"{k}" => {silk_repr(v)}'), 'toLuaTable': ('{', ', ', lambda k, v: f'{k} = {silk_repr(v)}')}[member]
+            _cl = {'toGraphQL': ' }', 'toElixirMap': '}', 'toScalaMap': ')', 'toKotlinMap': ')', 'toPhpArray': ']', 'toRustStruct': ' }', 'toCSharpDict': '}', 'toClojureMap': '}', 'toHaskellMap': ']', 'toGoMap': '}', 'toSwiftDict': ']', 'toPythonDict': '}', 'toRubyHash': '}', 'toLuaTable': '}'}
             return ('builtin', lambda args, ctx, m=_m, cl=_cl: (m[1].join(m[2](k, v) for k, v in obj.items()) if m[0] is None else m[0] + m[1].join(m[2](k, v) for k, v in obj.items()) + cl.get(member, '')))
         if member == 'toJSONPretty':
             return ('builtin', lambda args, ctx: json.dumps((f := lambda v: v if isinstance(v, (type(None), bool, int, float, str)) else [f(i) for i in v] if isinstance(v, list) else {str(k): f(val) for k, val in v.items()} if isinstance(v, dict) else str(v))(obj), indent=2))
@@ -420,7 +420,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda n, s: [obj[i*s:(i+1)*s] for i in range(n)])(int(args[0]), len(obj) // int(args[0])))
         if member == 'uniqueBy':
             return ('builtin', lambda args, ctx: (lambda s: [x for x in obj if (k := self._call_function(args[0], [x])) not in s and not s.add(k)])(set()))
-        if member in ('pairMap', 'mapPairs'):
+        if member in ('pairMap', 'mapPairs', 'mapWithNext'):
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i], obj[i+1]]) for i in range(len(obj) - 1)])
         if member == 'runLengthEncode':
             return ('builtin', lambda args, ctx: [[k, sum(1 for _ in g)] for k, g in __import__('itertools').groupby(obj)] if obj else [])
@@ -500,6 +500,7 @@ class MemberMixin:
             'toBase64': lambda: __import__('base64').b64encode(obj.encode()).decode(),
             'fromBase64': lambda: __import__('base64').b64decode(obj.encode()).decode(),
             'toMd5': lambda: __import__('hashlib').md5(obj.encode()).hexdigest(),
+            'toSha256': lambda: __import__('hashlib').sha256(obj.encode()).hexdigest(),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -655,8 +656,7 @@ class MemberMixin:
             'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
             'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0), 'divisorCount': lambda: sum(1 for i in range(1, int(obj) + 1) if int(obj) % i == 0),
             'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9, 'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
-            'sumTo': lambda: int(obj) * (int(obj) + 1) // 2,
-            'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
+            'sumTo': lambda: int(obj) * (int(obj) + 1) // 2, 'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
             'isAutomorphic': lambda: str(int(obj) ** 2).endswith(str(int(obj))),
             'toBits': lambda: [int(b) for b in bin(int(obj))[2:]],
             'isKaprekar': lambda: (lambda n, sq: any(int(str(sq)[:i]) + int(str(sq)[i:]) == n for i in range(1, len(str(sq)))) if n > 0 else False)(int(obj), int(obj) ** 2),
@@ -675,7 +675,7 @@ class MemberMixin:
             'digitProduct': lambda: __import__('functools').reduce(lambda a, b: a * b, (int(d) for d in str(abs(int(obj))))),
             'reverseDigits': lambda: int(str(abs(int(obj)))[::-1]) * (1 if int(obj) >= 0 else -1),
             'isSmith': lambda: (lambda n, ds, pf: n > 1 and not all(n % i for i in range(2, int(n**0.5)+1)) and ds(n) == sum(ds(p) for p in pf(n)))(int(obj), lambda x: sum(int(d) for d in str(x)), lambda n: (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
-            'abundantBy': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj),
+            'abundantBy': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj), 'abundance': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj),
             'isUntouchable': lambda: (lambda n: not any(sum(i for i in range(1, k) if k % i == 0) == n for k in range(2, 2*n+2)))(int(obj)),
             'isSphenic': lambda: (lambda n, pf: len(pf) == 3 and len(set(pf)) == 3)((n := int(obj)), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
             'isSemiPrime': lambda: (lambda pf: len(pf) == 2)((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
@@ -694,7 +694,7 @@ class MemberMixin:
             'subfactorial': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
             'doubleFactorial': lambda: __import__('functools').reduce(lambda a, b: a * b, range(int(obj), 0, -2), 1),
             'primorial': lambda: __import__('functools').reduce(lambda a, b: a * b, [p for p in range(2, int(obj)+1) if all(p % i for i in range(2, int(p**0.5)+1))], 1),
-            'abundance': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj),
+            'isLucky': lambda: (lambda n: (s := list(range(1, max(n*2, 10), 2))) and all((s := [s[j] for j in range(len(s)) if (j+1) % s[i] != 0]) or True for i in range(1, len(s)) if i < len(s) and s[i] <= len(s)) and n in s)(int(obj)),
         }
         if member in _simple:
             fn = _simple[member]
