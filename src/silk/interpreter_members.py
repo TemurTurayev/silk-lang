@@ -223,7 +223,7 @@ class MemberMixin:
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
         if member == 'toKafkaConfig': member = 'toZookeeperConfig'
-        if member in ('toRabbitmqConfig', 'toElasticConfig', 'toMysqlConfig', 'toMongoConfig', 'toCouchDBConfig', 'toInfluxDBConfig', 'toNeo4jConfig'): member = {'toRabbitmqConfig': 'toGrafanaConfig', 'toElasticConfig': 'toConsulKV', 'toMysqlConfig': 'toGrafanaConfig', 'toMongoConfig': 'toConsulKV', 'toCouchDBConfig': 'toGrafanaConfig', 'toInfluxDBConfig': 'toGrafanaConfig', 'toNeo4jConfig': 'toZookeeperConfig'}[member]
+        if member in ('toRabbitmqConfig', 'toElasticConfig', 'toMysqlConfig', 'toMongoConfig', 'toCouchDBConfig', 'toInfluxDBConfig', 'toNeo4jConfig', 'toCassandraConfig'): member = {'toRabbitmqConfig': 'toGrafanaConfig', 'toElasticConfig': 'toConsulKV', 'toMysqlConfig': 'toGrafanaConfig', 'toMongoConfig': 'toConsulKV', 'toCouchDBConfig': 'toGrafanaConfig', 'toInfluxDBConfig': 'toGrafanaConfig', 'toNeo4jConfig': 'toZookeeperConfig', 'toCassandraConfig': 'toConsulKV'}[member]
         if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream', 'toFluentBitConfig', 'toLogstashConfig', 'toSentinelConfig', 'toHAProxyConfig', 'toVarnishConfig', 'toEnvoyConfig', 'toTraefikConfig', 'toCaddyConfig', 'toZookeeperConfig', 'toMemcachedConfig', 'toPostgresConfig', 'toRedisClusterConfig'):
             _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};', 'toFluentBitConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toLogstashConfig': lambda k, v: f'{k} => {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toSentinelConfig': lambda k, v: f'sentinel {k} {v if isinstance(v, str) else silk_repr(v)}', 'toHAProxyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toVarnishConfig': lambda k, v: f'set {k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)};', 'toEnvoyConfig': lambda k, v: f'{k}: {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toTraefikConfig': lambda k, v: f'[{k}]\n  value = {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toCaddyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toZookeeperConfig': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toMemcachedConfig': lambda k, v: f'-{k} {v if isinstance(v, str) else silk_repr(v)}', 'toPostgresConfig': lambda k, v: f"{k} = '{v}'" if isinstance(v, str) else f'{k} = {silk_repr(v)}', 'toRedisClusterConfig': lambda k, v: f'cluster-{k} {v if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
@@ -255,6 +255,7 @@ class MemberMixin:
             'runningAverage': lambda: [(lambda s: int(s) if s == int(s) else s)(sum(obj[:i+1]) / (i+1)) for i in range(len(obj))],
             'duplicates': lambda: list(dict.fromkeys(x for x in obj if obj.count(x) > 1)),
             'mapDistinct': lambda: list(dict.fromkeys(obj)), 'mapUniq': lambda: list(dict.fromkeys(obj)),
+            'mapFlatten': lambda: [y for x in obj for y in (x if isinstance(x, list) else [x])],
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -317,15 +318,12 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda c: [c.update({(k := self._call_function(args[0], [x])): c.get(k, 0) + 1}) for x in obj] and c or c)({}))
         if member in ('chunked', 'chunk'):
             return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj), int(args[0]))])
-        if member in ('window', 'windowed'):
-            return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(len(obj) - int(args[0]) + 1)])
+        if member in ('window', 'windowed'): return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(len(obj) - int(args[0]) + 1)])
         if member == 'rotate': return ('builtin', lambda args, ctx: (lambda n: obj[-n:] + obj[:-n] if n else list(obj))(int(args[0]) % len(obj)) if obj else [])
-        if member == 'partition':
-            return ('builtin', lambda args, ctx: (lambda y, n: [(y if self._call_function(args[0], [x]) else n).append(x) for x in obj] and [y, n] or [y, n])([], []))
+        if member == 'partition': return ('builtin', lambda args, ctx: (lambda y, n: [(y if self._call_function(args[0], [x]) else n).append(x) for x in obj] and [y, n] or [y, n])([], []))
         if member == 'findLast': return ('builtin', lambda args, ctx: next((x for x in reversed(obj) if self._call_function(args[0], [x])), None))
         if member == 'findLastIndex': return ('builtin', lambda args, ctx: next((i for i in range(len(obj)-1, -1, -1) if self._call_function(args[0], [obj[i]])), -1))
-        if member in ('tally', 'frequencies', 'histogram'):
-            return ('builtin', lambda args, ctx: (lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({}))
+        if member in ('tally', 'frequencies', 'histogram'): return ('builtin', lambda args, ctx: (lambda c: [c.update({x: c.get(x, 0) + 1}) for x in obj] and c or c)({}))
         if member == 'interleave':
             return ('builtin', lambda args, ctx: [x for i in range(max(len(obj), len(args[0]))) for x in ([obj[i]] if i < len(obj) else []) + ([args[0][i]] if i < len(args[0]) else [])])
         if member == 'interleaveAll':
@@ -492,6 +490,7 @@ class MemberMixin:
             'toInitials': lambda: '.'.join(w[0].upper() for w in obj.split() if w) + '.',
             'toSlugCase': lambda: '-'.join(w.lower() for w in __import__('re').split(r'[\s_\-]+', obj)),
             'toHeaderCase': lambda: '-'.join(w.capitalize() for w in __import__('re').split(r'[\s_\-]+', obj)),
+            'toSwapCase': lambda: obj.swapcase(),
         }
         if member == 'toMorse': member = 'toMorseCode'
         if member in _noarg:
@@ -713,6 +712,7 @@ class MemberMixin:
             'centered': lambda a: int(a[0]) * int(obj) * (int(obj) - 1) // 2 + 1,
             'polygonal': lambda a: int(obj) * ((int(a[0]) - 2) * int(obj) - (int(a[0]) - 4)) // 2, 'nthDigit': lambda a: int(str(abs(int(obj)))[int(a[0])]), 'digitAt': lambda a: int(str(abs(int(obj)))[::-1][int(a[0])]), 'rotateDigits': lambda a: (lambda s, n: int(s[n:] + s[:n]))(str(int(obj)), int(a[0]) % len(str(int(obj)))), 'truncateDigits': lambda a: int(str(int(obj))[:int(a[0])]), 'padDigits': lambda a: str(int(obj)).zfill(int(a[0])),
             'isSmooth': lambda a: (lambda n, k: (lambda f: f(f, n, 2))((lambda f, n, d: n <= 1 if d > k else f(f, n // d, d) if n % d == 0 else f(f, n, d + 1))))(int(obj), int(a[0])),
+            'isRough': lambda a: (lambda n, k: all(n % d != 0 for d in range(2, min(k, n))))(int(obj), int(a[0])),
         }
         if member in _onearg:
             fn = _onearg[member]
