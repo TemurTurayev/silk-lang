@@ -222,8 +222,8 @@ class MemberMixin:
         if member in ('toTypeScript', 'toGraphQLSchema'):
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
-        if member in ('toDockerEnv', 'toMakefileVars'):
-            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}'}[member]
+        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML'):
+            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
@@ -452,6 +452,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda r: list(reversed(r)) if member == 'takeWhileRight' else obj[:len(obj)-len(r)])(list(__import__('itertools').takewhile(lambda x: self._call_function(args[0], [x]), reversed(obj)))))
         if member == 'mapPrev':
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i-1] if i > 0 else obj[i], obj[i]]) for i in range(len(obj))])
+        if member == 'mapWithBoth':
+            return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i-1] if i > 0 else obj[i], obj[i], obj[i+1] if i < len(obj)-1 else obj[i]]) for i in range(len(obj))])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -524,7 +526,7 @@ class MemberMixin:
             'toMorseCode': lambda: ' '.join({'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....','I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-','V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..','0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.'}[c] for c in obj.upper() if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
             'toBraille': lambda: ''.join(chr(0x2800 + [1,3,9,25,17,11,27,19,10,26][ord(c)-ord('a')]) if 'a' <= c <= 'j' else chr(0x2800 + [5,7,13,29,21,15,31,23,14,30][ord(c)-ord('k')]) if 'k' <= c <= 't' else chr(0x2800 + [37,39,58,45,61,53][ord(c)-ord('u')]) if 'u' <= c <= 'z' else c for c in obj.lower()),
             'toNato': lambda: ' '.join({'A':'Alfa','B':'Bravo','C':'Charlie','D':'Delta','E':'Echo','F':'Foxtrot','G':'Golf','H':'Hotel','I':'India','J':'Juliet','K':'Kilo','L':'Lima','M':'Mike','N':'November','O':'Oscar','P':'Papa','Q':'Quebec','R':'Romeo','S':'Sierra','T':'Tango','U':'Uniform','V':'Victor','W':'Whiskey','X':'X-ray','Y':'Yankee','Z':'Zulu'}.get(c, c) for c in obj.upper() if c.isalpha()),
-            'toPhonetic': lambda: '-'.join(c for c in obj.lower() if c.isalpha()),
+            'toPhonetic': lambda: '-'.join(c for c in obj.lower() if c.isalpha()), 'toAtbash': lambda: ''.join(chr(219 - ord(c)) if 'a' <= c <= 'z' else chr(155 - ord(c)) if 'A' <= c <= 'Z' else c for c in obj),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -659,18 +661,15 @@ class MemberMixin:
             while n: r.append(_d[n % base]); n //= base
             return ('-' if neg else '') + ''.join(reversed(r))
         _simple = {
-            'abs': lambda: abs(obj), 'floor': lambda: math.floor(obj),
-            'ceil': lambda: math.ceil(obj), 'round': lambda: round(obj),
+            'abs': lambda: abs(obj), 'floor': lambda: math.floor(obj), 'ceil': lambda: math.ceil(obj), 'round': lambda: round(obj),
             'toString': lambda: str(obj), 'sqrt': lambda: math.sqrt(obj),
             'isEven': lambda: int(obj) % 2 == 0, 'isOdd': lambda: int(obj) % 2 != 0,
             'isPositive': lambda: obj > 0, 'isNegative': lambda: obj < 0,
             'isZero': lambda: obj == 0, 'isInteger': lambda: isinstance(obj, int), 'isFloat': lambda: isinstance(obj, float), 'sign': lambda: (1 if obj > 0 else (-1 if obj < 0 else 0)),
             'toRadians': lambda: obj * math.pi / 180, 'toDegrees': lambda: obj * 180 / math.pi, 'factorial': lambda: math.factorial(int(obj)), 'toBinary': lambda: bin(int(obj))[2:],
-            'toHex': lambda: hex(int(obj))[2:], 'toOctal': lambda: oct(int(obj))[2:], 'toChar': lambda: chr(int(obj)),
-            'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
-            'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
-            'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0), 'divisorCount': lambda: sum(1 for i in range(1, int(obj) + 1) if int(obj) % i == 0),
-            'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9, 'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
+            'toHex': lambda: hex(int(obj))[2:], 'toOctal': lambda: oct(int(obj))[2:], 'toChar': lambda: chr(int(obj)), 'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
+            'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}", 'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
+            'divisorCount': lambda: sum(1 for i in range(1, int(obj) + 1) if int(obj) % i == 0), 'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9, 'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
             'sumTo': lambda: int(obj) * (int(obj) + 1) // 2, 'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
             'isAutomorphic': lambda: str(int(obj) ** 2).endswith(str(int(obj))), 'toBits': lambda: [int(b) for b in bin(int(obj))[2:]],
             'isKaprekar': lambda: (lambda n, sq: any(int(str(sq)[:i]) + int(str(sq)[i:]) == n for i in range(1, len(str(sq)))) if n > 0 else False)(int(obj), int(obj) ** 2),
@@ -695,6 +694,7 @@ class MemberMixin:
             'liouville': lambda: (-1)**len((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
             'radical': lambda: __import__('functools').reduce(lambda a, b: a * b, set((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)), 1),
             'omega': lambda: len(set((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2))), 'bigOmega': lambda: len((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
+            'isRegular': lambda: (lambda n, pf: n >= 1 and all(p in (2,3,5) for p in set(pf)))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
         }
         if member in _simple:
             fn = _simple[member]
