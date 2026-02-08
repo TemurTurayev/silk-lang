@@ -215,8 +215,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: '| ' + ' | '.join(str(k) for k in obj.keys()) + ' |\n| ' + ' | '.join('---' for _ in obj) + ' |\n| ' + ' | '.join(silk_repr(v) for v in obj.values()) + ' |')
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
-        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig'):
-            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' '}[member]
+        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig', 'toTerraformHCL'):
+            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' ', 'toTerraformHCL': ' = '}[member]
             _end = ';' if member == 'toNginxConfig' else ''
             return ('builtin', lambda args, ctx, s=_sep, e=_end: '\n'.join(f'{k}{s}{json.dumps(v) if isinstance(v, str) else silk_repr(v)}{e}' for k, v in obj.items()))
         if member == 'toTypeScript':
@@ -420,7 +420,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [y for i, x in enumerate(obj) for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [i, x]))])
         if member == 'reduceIndexed':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, ix: self._call_function(args[0], [acc, ix[0], ix[1]]), enumerate(obj), args[1]))
-        if member == 'filterIndexed':
+        if member in ('filterIndexed', 'filterMapIndexed'):
             return ('builtin', lambda args, ctx: [x for i, x in enumerate(obj) if self._call_function(args[0], [i, x])])
         if member == 'groupByCount':
             return ('builtin', lambda args, ctx: (lambda n, s: [obj[i*s:(i+1)*s] for i in range(n)])(int(args[0]), len(obj) // int(args[0])))
@@ -515,6 +515,7 @@ class MemberMixin:
             'toCRC32': lambda: format(__import__('zlib').crc32(obj.encode()) & 0xFFFFFFFF, '08x'),
             'toMorseCode': lambda: ' '.join({'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....','I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-','V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..','0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.'}[c] for c in obj.upper() if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
             'toBraille': lambda: ''.join(chr(0x2800 + [1,3,9,25,17,11,27,19,10,26][ord(c)-ord('a')]) if 'a' <= c <= 'j' else chr(0x2800 + [5,7,13,29,21,15,31,23,14,30][ord(c)-ord('k')]) if 'k' <= c <= 't' else chr(0x2800 + [37,39,58,45,61,53][ord(c)-ord('u')]) if 'u' <= c <= 'z' else c for c in obj.lower()),
+            'toNato': lambda: ' '.join({'A':'Alfa','B':'Bravo','C':'Charlie','D':'Delta','E':'Echo','F':'Foxtrot','G':'Golf','H':'Hotel','I':'India','J':'Juliet','K':'Kilo','L':'Lima','M':'Mike','N':'November','O':'Oscar','P':'Papa','Q':'Quebec','R':'Romeo','S':'Sierra','T':'Tango','U':'Uniform','V':'Victor','W':'Whiskey','X':'X-ray','Y':'Yankee','Z':'Zulu'}.get(c, c) for c in obj.upper() if c.isalpha()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -661,10 +662,8 @@ class MemberMixin:
             'toString': lambda: str(obj), 'sqrt': lambda: math.sqrt(obj),
             'isEven': lambda: int(obj) % 2 == 0, 'isOdd': lambda: int(obj) % 2 != 0,
             'isPositive': lambda: obj > 0, 'isNegative': lambda: obj < 0,
-            'isZero': lambda: obj == 0, 'isInteger': lambda: isinstance(obj, int), 'isFloat': lambda: isinstance(obj, float),
-            'sign': lambda: (1 if obj > 0 else (-1 if obj < 0 else 0)),
-            'toRadians': lambda: obj * math.pi / 180, 'toDegrees': lambda: obj * 180 / math.pi,
-            'factorial': lambda: math.factorial(int(obj)), 'toBinary': lambda: bin(int(obj))[2:],
+            'isZero': lambda: obj == 0, 'isInteger': lambda: isinstance(obj, int), 'isFloat': lambda: isinstance(obj, float), 'sign': lambda: (1 if obj > 0 else (-1 if obj < 0 else 0)),
+            'toRadians': lambda: obj * math.pi / 180, 'toDegrees': lambda: obj * 180 / math.pi, 'factorial': lambda: math.factorial(int(obj)), 'toBinary': lambda: bin(int(obj))[2:],
             'toHex': lambda: hex(int(obj))[2:], 'toOctal': lambda: oct(int(obj))[2:], 'toChar': lambda: chr(int(obj)),
             'digitSum': lambda: sum(int(d) for d in str(abs(int(obj)))), 'digitCount': lambda: len(str(abs(int(obj)))),
             'isPerfect': lambda: int(obj) > 1 and sum(i for i in range(1, int(obj)) if int(obj) % i == 0) == int(obj), 'toScientific': lambda: f"{obj:.1e}",
@@ -695,6 +694,7 @@ class MemberMixin:
             'isWieferich': lambda: (lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)) and pow(2, n-1, n*n) == 1)(int(obj)), 'isProth': lambda: (lambda n: n > 1 and any(n == k * (1 << e) + 1 and k < (1 << e) and k % 2 == 1 for e in range(1, n.bit_length()) for k in [((n-1) >> e)]))(int(obj)),
             'isHarmonious': lambda: (lambda n, d: n > 0 and (n * d) % sum(n // i for i in range(1, n+1) if n % i == 0) == 0)(int(obj), sum(1 for i in range(1, int(obj)+1) if int(obj) % i == 0)), 'sigma': lambda: sum(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
             'mobius': lambda: (lambda n, pf: 0 if len(pf) != len(set(pf)) else (-1)**len(pf))(int(obj), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
+            'liouville': lambda: (-1)**len((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
         }
         if member in _simple:
             fn = _simple[member]
