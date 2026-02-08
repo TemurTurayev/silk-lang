@@ -222,8 +222,8 @@ class MemberMixin:
         if member in ('toTypeScript', 'toGraphQLSchema'):
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
-        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV'):
-            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}'}[member]
+        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig'):
+            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
@@ -430,7 +430,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda n, s: [obj[i*s:(i+1)*s] for i in range(n)])(int(args[0]), len(obj) // int(args[0])))
         if member == 'uniqueBy':
             return ('builtin', lambda args, ctx: (lambda s: [x for x in obj if (k := self._call_function(args[0], [x])) not in s and not s.add(k)])(set()))
-        if member in ('pairMap', 'mapPairs', 'mapWithNext'):
+        if member in ('pairMap', 'mapPairs', 'mapWithNext', 'mapBetween'):
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i], obj[i+1]]) for i in range(len(obj) - 1)])
         if member == 'runLengthEncode':
             return ('builtin', lambda args, ctx: [[k, sum(1 for _ in g)] for k, g in __import__('itertools').groupby(obj)] if obj else [])
@@ -489,23 +489,14 @@ class MemberMixin:
             'isAscii': lambda: all(ord(c) < 128 for c in obj), 'toHashCode': lambda: hash(obj),
             'isDate': lambda: bool(__import__('re').match(r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$', obj)),
             'toSentenceCase': lambda: obj[0].upper() + obj[1:].lower() if obj else '',
-            'isPhoneNumber': lambda: bool(__import__('re').match(r'^[\+]?[\d\s\-\(\)]{7,}$', obj)),
-            'countVowels': lambda: sum(1 for c in obj.lower() if c in 'aeiou'),
-            'countConsonants': lambda: sum(1 for c in obj.lower() if c.isalpha() and c not in 'aeiou'),
-            'mirror': lambda: obj + obj[::-1],
-            'toAlternatingCase': lambda: ''.join(c.upper() if i % 2 else c.lower() for i, c in enumerate(obj)),
-            'isUpperCamelCase': lambda: bool(__import__('re').match(r'^[A-Z][a-zA-Z0-9]*$', obj)),
-            'isCamelCase': lambda: bool(__import__('re').match(r'^[a-z][a-zA-Z0-9]*$', obj)) and '_' not in obj,
-            'isSnakeCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9_]*$', obj)) and '__' not in obj,
-            'isKebabCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9\-]*$', obj)) and '--' not in obj,
-            'squeezeBlanks': lambda: __import__('re').sub(r'\n{3,}', '\n\n', obj),
-            'removeVowels': lambda: ''.join(c for c in obj if c.lower() not in 'aeiou'),
-            'removeConsonants': lambda: ''.join(c for c in obj if not c.isalpha() or c.lower() in 'aeiou'),
-            'toCamelWords': lambda: __import__('re').sub(r'([a-z])([A-Z])', r'\1_\2', obj).split('_'),
-            'toWordArray': lambda: obj.split(),
-            'charCount': lambda: len(set(obj)),
-            'encodeURI': lambda: __import__('urllib.parse', fromlist=['quote']).quote(obj, safe=''),
-            'decodeURI': lambda: __import__('urllib.parse', fromlist=['unquote']).unquote(obj),
+            'isPhoneNumber': lambda: bool(__import__('re').match(r'^[\+]?[\d\s\-\(\)]{7,}$', obj)), 'countVowels': lambda: sum(1 for c in obj.lower() if c in 'aeiou'),
+            'countConsonants': lambda: sum(1 for c in obj.lower() if c.isalpha() and c not in 'aeiou'), 'mirror': lambda: obj + obj[::-1],
+            'toAlternatingCase': lambda: ''.join(c.upper() if i % 2 else c.lower() for i, c in enumerate(obj)), 'isUpperCamelCase': lambda: bool(__import__('re').match(r'^[A-Z][a-zA-Z0-9]*$', obj)),
+            'isCamelCase': lambda: bool(__import__('re').match(r'^[a-z][a-zA-Z0-9]*$', obj)) and '_' not in obj, 'isSnakeCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9_]*$', obj)) and '__' not in obj,
+            'isKebabCase': lambda: bool(__import__('re').match(r'^[a-z][a-z0-9\-]*$', obj)) and '--' not in obj, 'squeezeBlanks': lambda: __import__('re').sub(r'\n{3,}', '\n\n', obj),
+            'removeVowels': lambda: ''.join(c for c in obj if c.lower() not in 'aeiou'), 'removeConsonants': lambda: ''.join(c for c in obj if not c.isalpha() or c.lower() in 'aeiou'),
+            'toCamelWords': lambda: __import__('re').sub(r'([a-z])([A-Z])', r'\1_\2', obj).split('_'), 'toWordArray': lambda: obj.split(), 'charCount': lambda: len(set(obj)),
+            'encodeURI': lambda: __import__('urllib.parse', fromlist=['quote']).quote(obj, safe=''), 'decodeURI': lambda: __import__('urllib.parse', fromlist=['unquote']).unquote(obj),
             'toSlug': lambda: __import__('re').sub(r'-+', '-', __import__('re').sub(r'[^a-z0-9]+', '-', obj.lower())).strip('-'),
             'toSnakeCase': lambda: __import__('re').sub(r'[\s\-]+', '_', __import__('re').sub(r'([a-z])([A-Z])', r'\1_\2', obj)).lower(),
             'toCamelCase': lambda: (lambda w: w[0].lower() + ''.join(x.title() for x in w[1:]) if w else '')(__import__('re').split(r'[\s_\-]+', obj)),
@@ -544,6 +535,15 @@ class MemberMixin:
         if member in _onearg:
             fn = _onearg[member]
             return ('builtin', lambda args, ctx: fn(args))
+        if member == 'toRailFence':
+            def _rf(args, ctx):
+                n, r = int(args[0]), ['' for _ in range(int(args[0]))]
+                row, d = 0, 1
+                for c in obj:
+                    r[row] += c; row += d
+                    if row == 0 or row == n - 1: d = -d
+                return ''.join(r)
+            return ('builtin', _rf)
         # Two-arg methods
         _twoarg = {
             'replace': lambda a: obj.replace(a[0], a[1]),
@@ -782,8 +782,8 @@ class MemberMixin:
             return ('builtin', _pnp)
         if member == 'asTime':
             return ('builtin', lambda args, ctx: (lambda n, h, m, s: f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}")(int(obj), int(obj) // 3600, (int(obj) % 3600) // 60, int(obj) % 60))
-        if member == 'isStrongPrime':
-            return ('builtin', lambda args, ctx: (lambda n, ip, np, pp: ip(n) and n > (pp(n) + np(n)) / 2)(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)), lambda n: next(p for p in range(n+1, n*2) if all(p % i for i in range(2, int(p**0.5)+1))), lambda n: next(p for p in range(n-1, 1, -1) if all(p % i for i in range(2, int(p**0.5)+1)))))
+        if member in ('isStrongPrime', 'isWeakPrime'):
+            return ('builtin', lambda args, ctx: (lambda n, ip, np, pp: ip(n) and (n > (pp(n) + np(n)) / 2 if member == 'isStrongPrime' else n < (pp(n) + np(n)) / 2))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)), lambda n: next(p for p in range(n+1, n*2) if all(p % i for i in range(2, int(p**0.5)+1))), lambda n: next(p for p in range(n-1, 1, -1) if all(p % i for i in range(2, int(p**0.5)+1)))))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
