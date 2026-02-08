@@ -1,0 +1,21 @@
+"""
+Tests for string .toOctStarDelimited() method - split words by ********.
+"""
+
+from silk.interpreter import Interpreter
+
+
+class TestStringToOctStarDelimited:
+
+    def _run(self, source):
+        interp = Interpreter()
+        interp.run(source)
+        return interp.output_lines
+
+    def test_toOctStarDelimited_basic(self):
+        output = self._run('print("hello world".toOctStarDelimited())')
+        assert output[-1] == "hello********world"
+
+    def test_toOctStarDelimited_three(self):
+        output = self._run('print("a b c".toOctStarDelimited())')
+        assert output[-1] == "a********b********c"
