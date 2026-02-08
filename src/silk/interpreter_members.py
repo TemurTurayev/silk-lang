@@ -215,8 +215,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: '| ' + ' | '.join(str(k) for k in obj.keys()) + ' |\n| ' + ' | '.join('---' for _ in obj) + ' |\n| ' + ' | '.join(silk_repr(v) for v in obj.values()) + ' |')
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
-        if member in ('toDSL', 'toProtobuf', 'toNginxConfig'):
-            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' '}[member]
+        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig'):
+            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' '}[member]
             _end = ';' if member == 'toNginxConfig' else ''
             return ('builtin', lambda args, ctx, s=_sep, e=_end: '\n'.join(f'{k}{s}{json.dumps(v) if isinstance(v, str) else silk_repr(v)}{e}' for k, v in obj.items()))
         if member == 'toTypeScript':
@@ -442,6 +442,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [((s.__setitem__(0, r) or True) if (r := self._call_function(args[1], [s[0], x])) is not False else None) for x in obj] and s[0])())
         if member in ('unfold', 'iterate'):
             return ('builtin', lambda args, ctx: (lambda s, fn, n: (r := [s]) and [r.append(fn(r[-1])) for _ in range(n-1)] and r)(args[0], lambda x: self._call_function(args[1], [x]), int(args[2])))
+        if member == 'mapEvery':
+            return ('builtin', lambda args, ctx: [self._call_function(args[1], [x]) if (i+1) % int(args[0]) == 0 else x for i, x in enumerate(obj)])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -512,6 +514,7 @@ class MemberMixin:
             'toROT13': lambda: obj.translate(str.maketrans('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', 'NOPQRSTUVWXYZABCDEFGHIJKLMnopqrstuvwxyzabcdefghijklm')),
             'toCRC32': lambda: format(__import__('zlib').crc32(obj.encode()) & 0xFFFFFFFF, '08x'),
             'toMorseCode': lambda: ' '.join({'A':'.-','B':'-...','C':'-.-.','D':'-..','E':'.','F':'..-.','G':'--.','H':'....','I':'..','J':'.---','K':'-.-','L':'.-..','M':'--','N':'-.','O':'---','P':'.--.','Q':'--.-','R':'.-.','S':'...','T':'-','U':'..-','V':'...-','W':'.--','X':'-..-','Y':'-.--','Z':'--..','0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.'}[c] for c in obj.upper() if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
+            'toBraille': lambda: ''.join(chr(0x2800 + [1,3,9,25,17,11,27,19,10,26][ord(c)-ord('a')]) if 'a' <= c <= 'j' else chr(0x2800 + [5,7,13,29,21,15,31,23,14,30][ord(c)-ord('k')]) if 'k' <= c <= 't' else chr(0x2800 + [37,39,58,45,61,53][ord(c)-ord('u')]) if 'u' <= c <= 'z' else c for c in obj.lower()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -680,21 +683,18 @@ class MemberMixin:
             'isPronic': lambda: (lambda k: k * (k + 1) == int(obj))(int(int(obj) ** 0.5)), 'digitProduct': lambda: __import__('functools').reduce(lambda a, b: a * b, (int(d) for d in str(abs(int(obj))))),
             'reverseDigits': lambda: int(str(abs(int(obj)))[::-1]) * (1 if int(obj) >= 0 else -1), 'isSmith': lambda: (lambda n, ds, pf: n > 1 and not all(n % i for i in range(2, int(n**0.5)+1)) and ds(n) == sum(ds(p) for p in pf(n)))(int(obj), lambda x: sum(int(d) for d in str(x)), lambda n: (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
             'abundantBy': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj), 'abundance': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) - int(obj),
-            'isUntouchable': lambda: (lambda n: not any(sum(i for i in range(1, k) if k % i == 0) == n for k in range(2, 2*n+2)))(int(obj)),
-            'isSphenic': lambda: (lambda n, pf: len(pf) == 3 and len(set(pf)) == 3)((n := int(obj)), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
+            'isUntouchable': lambda: (lambda n: not any(sum(i for i in range(1, k) if k % i == 0) == n for k in range(2, 2*n+2)))(int(obj)), 'isSphenic': lambda: (lambda n, pf: len(pf) == 3 and len(set(pf)) == 3)((n := int(obj)), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
             'isSemiPrime': lambda: (lambda pf: len(pf) == 2)((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)), 'isEmirp': lambda: (lambda n, ip: ip(n) and (r := int(str(n)[::-1])) != n and ip(r))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1))),
             'pentagonal': lambda: int(obj) * (3 * int(obj) - 1) // 2, 'hexagonal': lambda: int(obj) * (2 * int(obj) - 1),
             'catalan': lambda: math.factorial(2 * int(obj)) // (math.factorial(int(obj) + 1) * math.factorial(int(obj))), 'bell': lambda: __import__('functools').reduce(lambda r, _: (s := [r[-1]]) and [s.append(s[-1]+v) for v in r] and s, range(int(obj)), [1])[0],
-            'derangements': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
-            'motzkin': lambda: __import__('functools').reduce(lambda ab, i: (ab[1], ((2*i+1)*ab[1] + 3*(i-1)*ab[0]) // (i+2)), range(1, int(obj)+1), (1, 1))[1] if int(obj) > 0 else 1,
+            'derangements': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))), 'motzkin': lambda: __import__('functools').reduce(lambda ab, i: (ab[1], ((2*i+1)*ab[1] + 3*(i-1)*ab[0]) // (i+2)), range(1, int(obj)+1), (1, 1))[1] if int(obj) > 0 else 1,
             'tetrahedral': lambda: int(obj) * (int(obj) + 1) * (int(obj) + 2) // 6, 'pyramidal': lambda: int(obj) * (int(obj) + 1) * (2 * int(obj) + 1) // 6, 'star': lambda: 6 * int(obj) * (int(obj) - 1) + 1,
             'oblong': lambda: int(obj) * (int(obj) + 1), 'pronic': lambda: int(obj) * (int(obj) + 1), 'superFactorial': lambda: __import__('functools').reduce(lambda a, i: a * math.factorial(i), range(1, int(obj) + 1), 1),
             'subfactorial': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))), 'doubleFactorial': lambda: __import__('functools').reduce(lambda a, b: a * b, range(int(obj), 0, -2), 1),
-            'primorial': lambda: __import__('functools').reduce(lambda a, b: a * b, [p for p in range(2, int(obj)+1) if all(p % i for i in range(2, int(p**0.5)+1))], 1),
-            'isLucky': lambda: (lambda n: (s := list(range(1, max(n*2, 10), 2))) and all((s := [s[j] for j in range(len(s)) if (j+1) % s[i] != 0]) or True for i in range(1, len(s)) if i < len(s) and s[i] <= len(s)) and n in s)(int(obj)),
-            'isWieferich': lambda: (lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)) and pow(2, n-1, n*n) == 1)(int(obj)),
-            'isProth': lambda: (lambda n: n > 1 and any(n == k * (1 << e) + 1 and k < (1 << e) and k % 2 == 1 for e in range(1, n.bit_length()) for k in [((n-1) >> e)]))(int(obj)),
+            'primorial': lambda: __import__('functools').reduce(lambda a, b: a * b, [p for p in range(2, int(obj)+1) if all(p % i for i in range(2, int(p**0.5)+1))], 1), 'isLucky': lambda: (lambda n: (s := list(range(1, max(n*2, 10), 2))) and all((s := [s[j] for j in range(len(s)) if (j+1) % s[i] != 0]) or True for i in range(1, len(s)) if i < len(s) and s[i] <= len(s)) and n in s)(int(obj)),
+            'isWieferich': lambda: (lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)) and pow(2, n-1, n*n) == 1)(int(obj)), 'isProth': lambda: (lambda n: n > 1 and any(n == k * (1 << e) + 1 and k < (1 << e) and k % 2 == 1 for e in range(1, n.bit_length()) for k in [((n-1) >> e)]))(int(obj)),
             'isHarmonious': lambda: (lambda n, d: n > 0 and (n * d) % sum(n // i for i in range(1, n+1) if n % i == 0) == 0)(int(obj), sum(1 for i in range(1, int(obj)+1) if int(obj) % i == 0)), 'sigma': lambda: sum(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
+            'mobius': lambda: (lambda n, pf: 0 if len(pf) != len(set(pf)) else (-1)**len(pf))(int(obj), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
         }
         if member in _simple:
             fn = _simple[member]
