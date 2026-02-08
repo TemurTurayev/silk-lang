@@ -224,8 +224,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
         if member == 'toKafkaConfig': member = 'toZookeeperConfig'
         if member in ('toRabbitmqConfig', 'toElasticConfig', 'toMysqlConfig', 'toMongoConfig'): member = {'toRabbitmqConfig': 'toGrafanaConfig', 'toElasticConfig': 'toConsulKV', 'toMysqlConfig': 'toGrafanaConfig', 'toMongoConfig': 'toConsulKV'}[member]
-        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream', 'toFluentBitConfig', 'toLogstashConfig', 'toSentinelConfig', 'toHAProxyConfig', 'toVarnishConfig', 'toEnvoyConfig', 'toTraefikConfig', 'toCaddyConfig', 'toZookeeperConfig', 'toMemcachedConfig', 'toPostgresConfig'):
-            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};', 'toFluentBitConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toLogstashConfig': lambda k, v: f'{k} => {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toSentinelConfig': lambda k, v: f'sentinel {k} {v if isinstance(v, str) else silk_repr(v)}', 'toHAProxyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toVarnishConfig': lambda k, v: f'set {k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)};', 'toEnvoyConfig': lambda k, v: f'{k}: {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toTraefikConfig': lambda k, v: f'[{k}]\n  value = {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toCaddyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toZookeeperConfig': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toMemcachedConfig': lambda k, v: f'-{k} {v if isinstance(v, str) else silk_repr(v)}', 'toPostgresConfig': lambda k, v: f"{k} = '{v}'" if isinstance(v, str) else f'{k} = {silk_repr(v)}'}[member]
+        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream', 'toFluentBitConfig', 'toLogstashConfig', 'toSentinelConfig', 'toHAProxyConfig', 'toVarnishConfig', 'toEnvoyConfig', 'toTraefikConfig', 'toCaddyConfig', 'toZookeeperConfig', 'toMemcachedConfig', 'toPostgresConfig', 'toRedisClusterConfig'):
+            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};', 'toFluentBitConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toLogstashConfig': lambda k, v: f'{k} => {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toSentinelConfig': lambda k, v: f'sentinel {k} {v if isinstance(v, str) else silk_repr(v)}', 'toHAProxyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toVarnishConfig': lambda k, v: f'set {k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)};', 'toEnvoyConfig': lambda k, v: f'{k}: {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toTraefikConfig': lambda k, v: f'[{k}]\n  value = {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toCaddyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toZookeeperConfig': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toMemcachedConfig': lambda k, v: f'-{k} {v if isinstance(v, str) else silk_repr(v)}', 'toPostgresConfig': lambda k, v: f"{k} = '{v}'" if isinstance(v, str) else f'{k} = {silk_repr(v)}', 'toRedisClusterConfig': lambda k, v: f'cluster-{k} {v if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
@@ -254,7 +254,7 @@ class MemberMixin:
             'adjacentDiff': lambda: [obj[i+1] - obj[i] for i in range(len(obj) - 1)],
             'runningAverage': lambda: [(lambda s: int(s) if s == int(s) else s)(sum(obj[:i+1]) / (i+1)) for i in range(len(obj))],
             'duplicates': lambda: list(dict.fromkeys(x for x in obj if obj.count(x) > 1)),
-            'mapDistinct': lambda: list(dict.fromkeys(obj)),
+            'mapDistinct': lambda: list(dict.fromkeys(obj)), 'mapUniq': lambda: list(dict.fromkeys(obj)),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -355,8 +355,7 @@ class MemberMixin:
         if member == 'crossProduct': return ('builtin', lambda args, ctx: [[a, b] for a in obj for b in args[0]])
         if member == 'interleaveN':
             return ('builtin', lambda args, ctx: (lambda arrs: [arrs[j][i] for i in range(max(len(a) for a in arrs)) for j in range(len(arrs)) if i < len(arrs[j])])([obj] + args[0]))
-        if member == 'transpose':
-            return ('builtin', lambda args, ctx: [list(row) for row in zip(*obj)])
+        if member == 'transpose': return ('builtin', lambda args, ctx: [list(row) for row in zip(*obj)])
         if member == 'combinations':
             return ('builtin', lambda args, ctx: [list(c) for c in __import__('itertools').combinations(obj, int(args[0]))])
         if member == 'permutations':
@@ -495,6 +494,7 @@ class MemberMixin:
             'toDotNotation': lambda: '.'.join(__import__('re').split(r'[\s_\-]+', obj)),
             'toUpperFirst': lambda: ' '.join(w[0].upper() + w[1:] if w else '' for w in obj.split(' ')),
             'toLowerFirst': lambda: ' '.join(w[0].lower() + w[1:] if w else '' for w in obj.split(' ')),
+            'toAbbreviation': lambda: ''.join(w[0].upper() for w in obj.split() if w),
         }
         if member == 'toMorse': member = 'toMorseCode'
         if member in _noarg:
@@ -691,6 +691,7 @@ class MemberMixin:
             'isDecagonal': lambda: (lambda n, d: d >= 0 and int(d**0.5)**2 == d and (3+int(d**0.5)) % 8 == 0)(int(obj), 9+16*int(obj)),
             'isHeptagonal': lambda: (lambda n, d: d >= 0 and int(d**0.5)**2 == d and (3+int(d**0.5)) % 10 == 0)(int(obj), 9+40*int(obj)),
             'isOctagonal': lambda: (lambda n, d: d >= 0 and int(d**0.5)**2 == d and (2+int(d**0.5)) % 6 == 0)(int(obj), 4+12*int(obj)),
+            'isNonagonal': lambda: (lambda n, d: d >= 0 and int(d**0.5)**2 == d and (5+int(d**0.5)) % 14 == 0)(int(obj), 25+56*int(obj)),
         }
         if member == 'isEconomical': member = 'isFrugal'
         if member in _simple:
