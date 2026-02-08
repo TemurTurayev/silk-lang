@@ -215,8 +215,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: '| ' + ' | '.join(str(k) for k in obj.keys()) + ' |\n| ' + ' | '.join('---' for _ in obj) + ' |\n| ' + ' | '.join(silk_repr(v) for v in obj.values()) + ' |')
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
-        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig', 'toTerraformHCL', 'toHelmValues', 'toVaultPolicy'):
-            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' ', 'toTerraformHCL': ' = ', 'toHelmValues': ': ', 'toVaultPolicy': ' = '}[member]
+        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig', 'toTerraformHCL', 'toHelmValues', 'toVaultPolicy', 'toNomadJob'):
+            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' ', 'toTerraformHCL': ' = ', 'toHelmValues': ': ', 'toVaultPolicy': ' = ', 'toNomadJob': ' = '}[member]
             _end = ';' if member == 'toNginxConfig' else ''
             return ('builtin', lambda args, ctx, s=_sep, e=_end: '\n'.join(f'{k}{s}{json.dumps(v) if isinstance(v, str) else silk_repr(v)}{e}' for k, v in obj.items()))
         if member in ('toTypeScript', 'toGraphQLSchema'):
@@ -287,16 +287,13 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: obj[int(args[0]):int(args[1])])
         if member == 'zip3':
             return ('builtin', lambda args, ctx: [[x, y, z] for x, y, z in zip(obj, args[0], args[1])])
-        if member == 'indexOf':
-            return ('builtin', lambda args, ctx: obj.index(args[0]) if args[0] in obj else -1)
+        if member == 'indexOf': return ('builtin', lambda args, ctx: obj.index(args[0]) if args[0] in obj else -1)
         if member in ('map', 'collectMap'):
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [item]) for item in obj])
         if member == 'mapNotNull':
             return ('builtin', lambda args, ctx: [r for item in obj if (r := self._call_function(args[0], [item])) is not None])
-        if member == 'filter':
-            return ('builtin', lambda args, ctx: [item for item in obj if self._call_function(args[0], [item])])
-        if member == 'forEach':
-            return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in obj] and None)
+        if member == 'filter': return ('builtin', lambda args, ctx: [item for item in obj if self._call_function(args[0], [item])])
+        if member == 'forEach': return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in obj] and None)
         if member == 'reduce':
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, x: self._call_function(args[0], [acc, x]), obj, args[1]))
         if member == 'find':
@@ -456,8 +453,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [s.append(self._call_function(args[1], [s[-1], x])) for x in obj] and s[1:])())
         if member == 'foldMap':
             return ('builtin', lambda args, ctx: sum(self._call_function(args[0], [x]) for x in obj))
-        if member == 'mapUntil':
-            return ('builtin', lambda args, ctx: (lambda: (s := [False]) and [(x if s[0] else (s.__setitem__(0, True) or x) if self._call_function(args[0], [x]) else self._call_function(args[1], [x])) for x in obj])())
+        if member in ('mapUntil', 'mapAdjacent'):
+            if member == 'mapUntil':
+                return ('builtin', lambda args, ctx: (lambda: (s := [False]) and [(x if s[0] else (s.__setitem__(0, True) or x) if self._call_function(args[0], [x]) else self._call_function(args[1], [x])) for x in obj])())
+            return ('builtin', lambda args, ctx: [self._call_function(args[1], obj[i:i+int(args[0])]) for i in range(len(obj) - int(args[0]) + 1)])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -531,6 +530,7 @@ class MemberMixin:
             'wordWrap': lambda a: (lambda w, words: '\n'.join(lines) if (lines := __import__('functools').reduce(lambda acc, word: acc[:-1] + [acc[-1] + ' ' + word] if acc and len(acc[-1]) + 1 + len(word) <= w else acc + [word], words, [])) else '')(int(a[0]), obj.split()),
             'caesarCipher': lambda a: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + int(a[0])) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj),
             'vigenereCipher': lambda a: ''.join(chr((ord(c) - 97 + ord(a[0][i % len(a[0])].lower()) - 97) % 26 + 97) if c.isalpha() else c for i, c in enumerate(obj.lower())),
+            'toColumnar': lambda a: ''.join(obj[i::int(a[0])] for i in range(int(a[0]))),
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -782,8 +782,8 @@ class MemberMixin:
             return ('builtin', _pnp)
         if member == 'asTime':
             return ('builtin', lambda args, ctx: (lambda n, h, m, s: f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}")(int(obj), int(obj) // 3600, (int(obj) % 3600) // 60, int(obj) % 60))
-        if member in ('isStrongPrime', 'isWeakPrime'):
-            return ('builtin', lambda args, ctx: (lambda n, ip, np, pp: ip(n) and (n > (pp(n) + np(n)) / 2 if member == 'isStrongPrime' else n < (pp(n) + np(n)) / 2))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)), lambda n: next(p for p in range(n+1, n*2) if all(p % i for i in range(2, int(p**0.5)+1))), lambda n: next(p for p in range(n-1, 1, -1) if all(p % i for i in range(2, int(p**0.5)+1)))))
+        if member in ('isStrongPrime', 'isWeakPrime', 'isBalancedPrime'):
+            return ('builtin', lambda args, ctx: (lambda n, ip, np, pp, avg: ip(n) and (n > avg if member == 'isStrongPrime' else n < avg if member == 'isWeakPrime' else n * 2 == pp(n) + np(n)))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)), lambda n: next(p for p in range(n+1, n*2) if all(p % i for i in range(2, int(p**0.5)+1))), lambda n: next(p for p in range(n-1, 1, -1) if all(p % i for i in range(2, int(p**0.5)+1))), (lambda pp, np: (pp(int(obj)) + np(int(obj))) / 2)(lambda n: next(p for p in range(n-1, 1, -1) if all(p % i for i in range(2, int(p**0.5)+1))), lambda n: next(p for p in range(n+1, n*2) if all(p % i for i in range(2, int(p**0.5)+1))))))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
