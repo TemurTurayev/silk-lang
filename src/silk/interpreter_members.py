@@ -222,8 +222,8 @@ class MemberMixin:
         if member in ('toTypeScript', 'toGraphQLSchema'):
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
-        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig'):
-            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}'}[member]
+        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig'):
+            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
@@ -336,10 +336,8 @@ class MemberMixin:
                 for x in items: acc = self._call_function(args[0], [acc, x]); r.append(acc)
                 return r[::-1] if member == 'scanRight' else r
             return ('builtin', _scan)
-        if member == 'product':
-            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda a, b: a * b, obj, 1))
-        if member in ('mapIndexed', 'mapWithIndex'):
-            return ('builtin', lambda args, ctx: [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)])
+        if member == 'product': return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda a, b: a * b, obj, 1))
+        if member in ('mapIndexed', 'mapWithIndex'): return ('builtin', lambda args, ctx: [self._call_function(args[0], [i, item]) for i, item in enumerate(obj)])
         if member == 'average':
             return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)(sum(obj) / len(obj)))
         if member == 'none':
@@ -450,6 +448,7 @@ class MemberMixin:
                 return ('builtin', lambda args, ctx: [self._call_function(args[1], obj[i:i+int(args[0])]) for i in range(len(obj) - int(args[0]) + 1)])
             return ('builtin', lambda args, ctx: [self._call_function(args[1], obj[i:i+int(args[0])]) for i in range(0, len(obj), int(args[0]))])
         if member == 'mapWhere': return ('builtin', lambda args, ctx: [self._call_function(args[1], [x]) if self._call_function(args[0], [x]) else x for x in obj])
+        if member == 'mapSkip': return ('builtin', lambda args, ctx: [obj[i] if i < int(args[0]) else self._call_function(args[1], [obj[i]]) for i in range(len(obj))])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -508,7 +507,7 @@ class MemberMixin:
             'toPolybius': lambda: ' '.join((lambda p: f'{p//5+1}{p%5+1}')((lambda c: ord(c)-ord('a') if c < 'k' else ord(c)-ord('a')-1)(c)) for c in obj.lower().replace('k','c') if c.isalpha()),
             'toBacon': lambda: ' '.join(bin(ord(c) - ord('a'))[2:].zfill(5).replace('0', 'A').replace('1', 'B') for c in obj.lower() if c.isalpha()),
             'toSemaphore': lambda: ' '.join(str(ord(c) - ord('a') + 1) for c in obj.lower() if c.isalpha()), 'toASCIIArt': lambda: ' '.join(str(ord(c)) for c in obj),
-            'toBinary': lambda: ' '.join(format(ord(c), '08b') for c in obj),
+            'toBinary': lambda: ' '.join(format(ord(c), '08b') for c in obj), 'toOctal': lambda: ' '.join(format(ord(c), 'o') for c in obj),
         }
         if member == 'toMorse': member = 'toMorseCode'
         if member in _noarg:
@@ -693,6 +692,7 @@ class MemberMixin:
             'isChen': lambda: (lambda n, ip, isp: ip(n) and (ip(n+2) or isp(n+2)))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)), lambda n: len((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)) == 2),
             'isWasteful': lambda: (lambda n, pf: sum(len(str(p)) for p in pf) > len(str(n)))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
             'isFrugal': lambda: (lambda n, pf: n > 1 and (lambda pe: sum(len(str(p)) + (len(str(e)) if e > 1 else 0) for p, e in pe) < len(str(n)))({p: pf.count(p) for p in set(pf)}.items()))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
+            'isEquidigital': lambda: (lambda n, pf: n > 1 and (lambda pe: sum(len(str(p)) + (len(str(e)) if e > 1 else 0) for p, e in pe) == len(str(n)))({p: pf.count(p) for p in set(pf)}.items()))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
         }
         if member in _simple:
             fn = _simple[member]
