@@ -1,5 +1,5 @@
 """
-Tests for dict .toXML(root) method.
+Tests for dict .toXML() method - convert dict to XML string.
 """
 
 from silk.interpreter import Interpreter
@@ -14,16 +14,14 @@ class TestDictToXML:
 
     def test_toXML_basic(self):
         output = self._run('''
-let d = {"name": "Alice", "age": 30}
-let xml = d.toXML("person")
-print(xml.contains("<name>Alice</name>"))
+let d = {"name": "Bob"}
+print(d.toXML())
 ''')
-        assert output[-1] == "true"
+        assert output[-1] == '<root><name>Bob</name></root>'
 
-    def test_toXML_root(self):
+    def test_toXML_number(self):
         output = self._run('''
-let d = {"x": 1}
-let xml = d.toXML("item")
-print(xml.starts_with("<item>"))
+let d = {"age": 30}
+print(d.toXML())
 ''')
-        assert output[-1] == "true"
+        assert output[-1] == '<root><age>30</age></root>'

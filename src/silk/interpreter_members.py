@@ -195,7 +195,7 @@ class MemberMixin:
         if member == 'deepSet':
             return ('builtin', lambda args, ctx: (s := lambda d, keys, v: {**d, keys[0]: s(d.get(keys[0], {}), keys[1:], v) if len(keys) > 1 else v} if isinstance(d, dict) else {keys[0]: s({}, keys[1:], v) if len(keys) > 1 else v})(obj, args[0].split('.'), args[1]))
         if member in ('toXML', 'toYAML', 'toINI', 'toEnvironment'):
-            return ('builtin', lambda args, ctx: f"<{args[0]}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{args[0]}>" if member == 'toXML' else '\n'.join(f"{'export ' if member == 'toEnvironment' else ''}{k}{'=' if member in ('toINI', 'toEnvironment') else ': '}{silk_repr(v)}" for k, v in obj.items()))
+            return ('builtin', lambda args, ctx: (lambda t: f"<{t}>" + ''.join(f"<{k}>{silk_repr(v)}</{k}>" for k, v in obj.items()) + f"</{t}>")(args[0] if args else 'root') if member == 'toXML' else '\n'.join(f"{'export ' if member == 'toEnvironment' else ''}{k}{'=' if member in ('toINI', 'toEnvironment') else ': '}{silk_repr(v)}" for k, v in obj.items()))
         if member in ('toSQLInsert', 'toSQLUpdate', 'toSQLWhere', 'toSQLDelete'):
             return ('builtin', lambda args, ctx: f"INSERT INTO {args[0]} ({', '.join(obj.keys())}) VALUES ({', '.join(silk_repr(v) for v in obj.values())})" if member == 'toSQLInsert' else f"UPDATE {args[0]} SET {', '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}" if member == 'toSQLUpdate' else f"SELECT * FROM {args[0]} WHERE {' AND '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}" if member == 'toSQLWhere' else f"DELETE FROM {args[0]} WHERE {' AND '.join(f'{k} = {silk_repr(v)}' for k, v in obj.items())}")
         if member in ('toDotNotation', 'fromDotNotation'):
@@ -434,6 +434,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, x: self._call_function(args[0], [acc, x]), reversed(obj), args[1]))
         if member == 'reduceWhile':
             return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [((s.__setitem__(0, r) or True) if (r := self._call_function(args[1], [s[0], x])) is not False else None) for x in obj] and s[0])())
+        if member == 'unfold':
+            return ('builtin', lambda args, ctx: (lambda s, fn, n: (r := [s]) and [r.append(fn(r[-1])) for _ in range(n-1)] and r)(args[0], lambda x: self._call_function(args[1], [x]), int(args[2])))
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -500,7 +502,7 @@ class MemberMixin:
             'toBase64': lambda: __import__('base64').b64encode(obj.encode()).decode(),
             'fromBase64': lambda: __import__('base64').b64decode(obj.encode()).decode(),
             'toMd5': lambda: __import__('hashlib').md5(obj.encode()).hexdigest(),
-            'toSha256': lambda: __import__('hashlib').sha256(obj.encode()).hexdigest(),
+            'toSha256': lambda: __import__('hashlib').sha256(obj.encode()).hexdigest(), 'toHex': lambda: obj.encode().hex(),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -657,8 +659,7 @@ class MemberMixin:
             'factors': lambda: sorted(i for i in range(1, int(obj) + 1) if int(obj) % i == 0), 'divisorCount': lambda: sum(1 for i in range(1, int(obj) + 1) if int(obj) % i == 0),
             'digitalRoot': lambda: 0 if obj == 0 else 1 + (int(obj) - 1) % 9, 'isHarshad': lambda: int(obj) > 0 and int(obj) % sum(int(d) for d in str(int(obj))) == 0,
             'sumTo': lambda: int(obj) * (int(obj) + 1) // 2, 'aliquotSum': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0),
-            'isAutomorphic': lambda: str(int(obj) ** 2).endswith(str(int(obj))),
-            'toBits': lambda: [int(b) for b in bin(int(obj))[2:]],
+            'isAutomorphic': lambda: str(int(obj) ** 2).endswith(str(int(obj))), 'toBits': lambda: [int(b) for b in bin(int(obj))[2:]],
             'isKaprekar': lambda: (lambda n, sq: any(int(str(sq)[:i]) + int(str(sq)[i:]) == n for i in range(1, len(str(sq)))) if n > 0 else False)(int(obj), int(obj) ** 2),
             'cubeRoot': lambda: (lambda r: int(r) if r == int(r) else r)(round(obj ** (1/3), 10)),
             'isAbundant': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) > int(obj), 'isDeficient': lambda: sum(i for i in range(1, int(obj)) if int(obj) % i == 0) < int(obj),
@@ -680,8 +681,7 @@ class MemberMixin:
             'isSphenic': lambda: (lambda n, pf: len(pf) == 3 and len(set(pf)) == 3)((n := int(obj)), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(n, 2)),
             'isSemiPrime': lambda: (lambda pf: len(pf) == 2)((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
             'isEmirp': lambda: (lambda n, ip: ip(n) and (r := int(str(n)[::-1])) != n and ip(r))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1))),
-            'pentagonal': lambda: int(obj) * (3 * int(obj) - 1) // 2,
-            'hexagonal': lambda: int(obj) * (2 * int(obj) - 1),
+            'pentagonal': lambda: int(obj) * (3 * int(obj) - 1) // 2, 'hexagonal': lambda: int(obj) * (2 * int(obj) - 1),
             'catalan': lambda: math.factorial(2 * int(obj)) // (math.factorial(int(obj) + 1) * math.factorial(int(obj))),
             'bell': lambda: __import__('functools').reduce(lambda r, _: (s := [r[-1]]) and [s.append(s[-1]+v) for v in r] and s, range(int(obj)), [1])[0],
             'derangements': lambda: round(math.factorial(int(obj)) * sum((-1)**k / math.factorial(k) for k in range(int(obj)+1))),
@@ -773,7 +773,7 @@ class MemberMixin:
         if member == 'toCurrency':
             return ('builtin', lambda args, ctx: f"${obj:,.2f}")
         if member == 'isAmicable':
-            return ('builtin', lambda args, ctx: (lambda _ds: (lambda a, b: a != b and _ds(a) == b and _ds(b) == a)(int(obj), int(args[0])))(lambda n: sum(i for i in range(1, n) if n % i == 0)))
+            return ('builtin', lambda args, ctx: (lambda _ds, n: (lambda b: b != n and _ds(b) == n)(_ds(n)) if len(args) == 0 else (lambda a, b: a != b and _ds(a) == b and _ds(b) == a)(n, int(args[0])))(lambda n: sum(i for i in range(1, n) if n % i == 0), int(obj)))
         if member == 'primeFactors':
             return ('builtin', lambda args, ctx: (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2))
         if member in ('prevPrime', 'nextPrime'):
