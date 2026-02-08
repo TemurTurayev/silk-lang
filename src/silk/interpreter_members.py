@@ -222,8 +222,8 @@ class MemberMixin:
         if member in ('toTypeScript', 'toGraphQLSchema'):
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
-        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream', 'toFluentBitConfig', 'toLogstashConfig', 'toSentinelConfig', 'toHAProxyConfig', 'toVarnishConfig'):
-            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};', 'toFluentBitConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toLogstashConfig': lambda k, v: f'{k} => {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toSentinelConfig': lambda k, v: f'sentinel {k} {v if isinstance(v, str) else silk_repr(v)}', 'toHAProxyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toVarnishConfig': lambda k, v: f'set {k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)};'}[member]
+        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream', 'toFluentBitConfig', 'toLogstashConfig', 'toSentinelConfig', 'toHAProxyConfig', 'toVarnishConfig', 'toEnvoyConfig'):
+            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};', 'toFluentBitConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toLogstashConfig': lambda k, v: f'{k} => {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toSentinelConfig': lambda k, v: f'sentinel {k} {v if isinstance(v, str) else silk_repr(v)}', 'toHAProxyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toVarnishConfig': lambda k, v: f'set {k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)};', 'toEnvoyConfig': lambda k, v: f'{k}: {json.dumps(v) if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
@@ -380,8 +380,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [list(g) for _, g in __import__('itertools').groupby(obj)] if obj else [])
         if member in ('mapFirst', 'mapLast'):
             return ('builtin', lambda args, ctx: [] if not obj else (lambda r: r.__setitem__(0 if member == 'mapFirst' else -1, self._call_function(args[0], [r[0 if member == 'mapFirst' else -1]])) or r)(list(obj)))
-        if member in ('minBy', 'maxBy'):
-            return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
+        if member in ('minBy', 'maxBy'): return ('builtin', lambda args, ctx: (min if member == 'minBy' else max)(obj, key=lambda x: self._call_function(args[0], [x])))
         if member in ('forEachRight', 'mapRight'):
             return ('builtin', lambda args, ctx: (lambda r: None if member == 'forEachRight' else r)([self._call_function(args[0], [x]) for x in reversed(obj)]))
         if member == 'tapEach':
@@ -441,11 +440,10 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [self._call_function(args[1], obj[i:i+int(args[0])]) for i in range(0, len(obj), int(args[0]))])
         if member == 'mapWhere': return ('builtin', lambda args, ctx: [self._call_function(args[1], [x]) if self._call_function(args[0], [x]) else x for x in obj])
         if member == 'mapReverse': return ('builtin', lambda args, ctx: [self._call_function(args[0], [x]) for x in reversed(obj)])
+        if member == 'mapFlatMap': return ('builtin', lambda args, ctx: [y for x in obj for y in (lambda r: r if isinstance(r, list) else [r])(self._call_function(args[0], [x]))])
         if member == 'mapPairwise': return ('builtin', lambda args, ctx: [self._call_function(args[0], [obj[i], obj[i+1]]) for i in range(0, len(obj) - 1, 2)])
-        if member in ('mapExcept', 'mapOnly'):
-            return ('builtin', lambda args, ctx: [(self._call_function(args[1], [obj[i]]) if (i in args[0]) == (member == 'mapOnly') else obj[i]) for i in range(len(obj))])
-        if member in ('mapSkip', 'mapTake'):
-            return ('builtin', lambda args, ctx: [(obj[i] if i < int(args[0]) else self._call_function(args[1], [obj[i]])) if member == 'mapSkip' else (self._call_function(args[1], [obj[i]]) if i < int(args[0]) else obj[i]) for i in range(len(obj))])
+        if member in ('mapExcept', 'mapOnly'): return ('builtin', lambda args, ctx: [(self._call_function(args[1], [obj[i]]) if (i in args[0]) == (member == 'mapOnly') else obj[i]) for i in range(len(obj))])
+        if member in ('mapSkip', 'mapTake'): return ('builtin', lambda args, ctx: [(obj[i] if i < int(args[0]) else self._call_function(args[1], [obj[i]])) if member == 'mapSkip' else (self._call_function(args[1], [obj[i]]) if i < int(args[0]) else obj[i]) for i in range(len(obj))])
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -507,6 +505,7 @@ class MemberMixin:
             'toBinary': lambda: ' '.join(format(ord(c), '08b') for c in obj), 'toOctal': lambda: ' '.join(format(ord(c), 'o') for c in obj), 'toDecimal': lambda: ','.join(str(ord(c)) for c in obj), 'toUnicodeEscape': lambda: ''.join(f'\\u{ord(c):04x}' for c in obj),
             'toHTMLEntities': lambda: obj.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#39;'), 'toURLEncode': lambda: __import__('urllib.parse', fromlist=['quote']).quote(obj), 'toURLDecode': lambda: __import__('urllib.parse', fromlist=['unquote']).unquote(obj),
             'toPigLatin': lambda: ' '.join((w + 'yay' if w[0].lower() in 'aeiou' else (lambda i: w[i:] + w[:i] + 'ay')(next((j for j in range(len(w)) if w[j].lower() in 'aeiou'), len(w)))) for w in obj.split()),
+            'toBase32': lambda: __import__('base64').b32encode(obj.encode()).decode().rstrip('='),
         }
         if member == 'toMorse': member = 'toMorseCode'
         if member in _noarg:
@@ -692,6 +691,7 @@ class MemberMixin:
             'isWasteful': lambda: (lambda n, pf: sum(len(str(p)) for p in pf) > len(str(n)))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
             'isFrugal': lambda: (lambda n, pf: n > 1 and (lambda pe: sum(len(str(p)) + (len(str(e)) if e > 1 else 0) for p, e in pe) < len(str(n)))({p: pf.count(p) for p in set(pf)}.items()))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
             'isEquidigital': lambda: (lambda n, pf: n > 1 and (lambda pe: sum(len(str(p)) + (len(str(e)) if e > 1 else 0) for p, e in pe) == len(str(n)))({p: pf.count(p) for p in set(pf)}.items()))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
+            'isSelfDescribing': lambda: (lambda s: all(int(s[i]) == s.count(str(i)) for i in range(len(s))))(str(int(obj))),
         }
         if member == 'isEconomical': member = 'isFrugal'
         if member in _simple:
