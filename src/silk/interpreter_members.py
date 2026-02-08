@@ -221,6 +221,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx, s=_sep, e=_end: '\n'.join(f'{k}{s}{json.dumps(v) if isinstance(v, str) else silk_repr(v)}{e}' for k, v in obj.items()))
         if member == 'toTypeScript':
             return ('builtin', lambda args, ctx: 'interface Data { ' + ' '.join(f'{k}: {"string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "boolean" if isinstance(v, bool) else "any"};' for k, v in obj.items()) + ' }')
+        if member == 'toDockerEnv':
+            return ('builtin', lambda args, ctx: '\n'.join(f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}' for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
     def _eval_list_member(self, obj: list, member: str) -> Any:
@@ -444,6 +446,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda s, fn, n: (r := [s]) and [r.append(fn(r[-1])) for _ in range(n-1)] and r)(args[0], lambda x: self._call_function(args[1], [x]), int(args[2])))
         if member == 'mapEvery':
             return ('builtin', lambda args, ctx: [self._call_function(args[1], [x]) if (i+1) % int(args[0]) == 0 else x for i, x in enumerate(obj)])
+        if member == 'takeWhileRight':
+            return ('builtin', lambda args, ctx: (lambda r: list(reversed(r)))(list(__import__('itertools').takewhile(lambda x: self._call_function(args[0], [x]), reversed(obj)))))
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -523,22 +527,17 @@ class MemberMixin:
         # Single-arg methods
         _onearg = {
             'contains': lambda a: a[0] in obj, 'includes': lambda a: a[0] in obj,
-            'starts_with': lambda a: obj.startswith(a[0]),
-            'ends_with': lambda a: obj.endswith(a[0]),
-            'indexOf': lambda a: obj.find(a[0]),
-            'lastIndexOf': lambda a: obj.rfind(a[0]),
-            'count': lambda a: obj.count(a[0]),
-            'split': lambda a: obj.split(a[0] if a else " "),
-            'repeat': lambda a: obj * int(a[0]),
-            'charAt': lambda a: obj[int(a[0])],
-            'charCodeAt': lambda a: ord(obj[int(a[0])]),
-            'zfill': lambda a: obj.zfill(int(a[0])),
+            'starts_with': lambda a: obj.startswith(a[0]), 'ends_with': lambda a: obj.endswith(a[0]),
+            'indexOf': lambda a: obj.find(a[0]), 'lastIndexOf': lambda a: obj.rfind(a[0]),
+            'count': lambda a: obj.count(a[0]), 'split': lambda a: obj.split(a[0] if a else " "), 'repeat': lambda a: obj * int(a[0]),
+            'charAt': lambda a: obj[int(a[0])], 'charCodeAt': lambda a: ord(obj[int(a[0])]), 'zfill': lambda a: obj.zfill(int(a[0])),
             'countWords': lambda a: obj.split().count(a[0]),
             'isAnagram': lambda a: sorted(obj.lower().replace(' ', '')) == sorted(a[0].lower().replace(' ', '')),
             'indent': lambda a: '\n'.join(' ' * int(a[0]) + l for l in obj.split('\n')),
             'surround': lambda a: a[0] + obj + a[0],
             'removeAt': lambda a: obj[:int(a[0])] + obj[int(a[0])+1:],
             'wordWrap': lambda a: (lambda w, words: '\n'.join(lines) if (lines := __import__('functools').reduce(lambda acc, word: acc[:-1] + [acc[-1] + ' ' + word] if acc and len(acc[-1]) + 1 + len(word) <= w else acc + [word], words, [])) else '')(int(a[0]), obj.split()),
+            'caesarCipher': lambda a: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + int(a[0])) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj),
         }
         if member in _onearg:
             fn = _onearg[member]
@@ -695,6 +694,7 @@ class MemberMixin:
             'isHarmonious': lambda: (lambda n, d: n > 0 and (n * d) % sum(n // i for i in range(1, n+1) if n % i == 0) == 0)(int(obj), sum(1 for i in range(1, int(obj)+1) if int(obj) % i == 0)), 'sigma': lambda: sum(i for i in range(1, int(obj) + 1) if int(obj) % i == 0),
             'mobius': lambda: (lambda n, pf: 0 if len(pf) != len(set(pf)) else (-1)**len(pf))(int(obj), (f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
             'liouville': lambda: (-1)**len((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)),
+            'radical': lambda: __import__('functools').reduce(lambda a, b: a * b, set((f := lambda n, d: [] if n <= 1 else [d] + f(n//d, d) if n % d == 0 else f(n, d+1))(int(obj), 2)), 1),
         }
         if member in _simple:
             fn = _simple[member]
