@@ -215,8 +215,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: '| ' + ' | '.join(str(k) for k in obj.keys()) + ' |\n| ' + ' | '.join('---' for _ in obj) + ' |\n| ' + ' | '.join(silk_repr(v) for v in obj.values()) + ' |')
         if member in ('minByValue', 'maxByValue'):
             return ('builtin', lambda args, ctx: (min if member == 'minByValue' else max)(obj, key=obj.get))
-        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig', 'toTerraformHCL', 'toHelmValues'):
-            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' ', 'toTerraformHCL': ' = ', 'toHelmValues': ': '}[member]
+        if member in ('toDSL', 'toProtobuf', 'toNginxConfig', 'toApacheConfig', 'toTerraformHCL', 'toHelmValues', 'toVaultPolicy'):
+            _sep = {'toProtobuf': ': ', 'toDSL': ' ', 'toNginxConfig': ' ', 'toApacheConfig': ' ', 'toTerraformHCL': ' = ', 'toHelmValues': ': ', 'toVaultPolicy': ' = '}[member]
             _end = ';' if member == 'toNginxConfig' else ''
             return ('builtin', lambda args, ctx, s=_sep, e=_end: '\n'.join(f'{k}{s}{json.dumps(v) if isinstance(v, str) else silk_repr(v)}{e}' for k, v in obj.items()))
         if member in ('toTypeScript', 'toGraphQLSchema'):
@@ -289,7 +289,7 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: [[x, y, z] for x, y, z in zip(obj, args[0], args[1])])
         if member == 'indexOf':
             return ('builtin', lambda args, ctx: obj.index(args[0]) if args[0] in obj else -1)
-        if member == 'map':
+        if member in ('map', 'collectMap'):
             return ('builtin', lambda args, ctx: [self._call_function(args[0], [item]) for item in obj])
         if member == 'mapNotNull':
             return ('builtin', lambda args, ctx: [r for item in obj if (r := self._call_function(args[0], [item])) is not None])
@@ -484,12 +484,9 @@ class MemberMixin:
             'collapseWhitespace': lambda: ' '.join(obj.split()), 'reverseWords': lambda: ' '.join(obj.split()[::-1]),
             'trimLines': lambda: '\n'.join(l.strip() for l in obj.split('\n')),
             'removeDuplicateChars': lambda: ''.join(obj[i] for i in range(len(obj)) if i == 0 or obj[i] != obj[i-1]),
-            'toAcronym': lambda: ''.join(w[0].upper() for w in obj.split() if w),
-            'sizeInBytes': lambda: len(obj.encode('utf-8')),
-            'isWhitespace': lambda: len(obj) > 0 and obj.isspace(),
-            'isHex': lambda: len(obj) > 0 and all(c in '0123456789abcdefABCDEF' for c in obj),
-            'isAscii': lambda: all(ord(c) < 128 for c in obj),
-            'toHashCode': lambda: hash(obj),
+            'toAcronym': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'sizeInBytes': lambda: len(obj.encode('utf-8')),
+            'isWhitespace': lambda: len(obj) > 0 and obj.isspace(), 'isHex': lambda: len(obj) > 0 and all(c in '0123456789abcdefABCDEF' for c in obj),
+            'isAscii': lambda: all(ord(c) < 128 for c in obj), 'toHashCode': lambda: hash(obj),
             'isDate': lambda: bool(__import__('re').match(r'^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$', obj)),
             'toSentenceCase': lambda: obj[0].upper() + obj[1:].lower() if obj else '',
             'isPhoneNumber': lambda: bool(__import__('re').match(r'^[\+]?[\d\s\-\(\)]{7,}$', obj)),
@@ -526,6 +523,7 @@ class MemberMixin:
             'toA1Z26': lambda: '-'.join(str(ord(c) - 96) for c in obj.lower() if c.isalpha()),
             'toTapCode': lambda: ' '.join((lambda p: f'{p//5+1},{p%5+1}')((lambda c: ord(c)-ord('a') if c < 'k' else ord(c)-ord('a')-1)(c)) for c in obj.lower().replace('k','c') if c.isalpha()),
             'toPolybius': lambda: ' '.join((lambda p: f'{p//5+1}{p%5+1}')((lambda c: ord(c)-ord('a') if c < 'k' else ord(c)-ord('a')-1)(c)) for c in obj.lower().replace('k','c') if c.isalpha()),
+            'toBacon': lambda: ' '.join(bin(ord(c) - ord('a'))[2:].zfill(5).replace('0', 'A').replace('1', 'B') for c in obj.lower() if c.isalpha()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -784,6 +782,8 @@ class MemberMixin:
             return ('builtin', _pnp)
         if member == 'asTime':
             return ('builtin', lambda args, ctx: (lambda n, h, m, s: f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}")(int(obj), int(obj) // 3600, (int(obj) % 3600) // 60, int(obj) % 60))
+        if member == 'isStrongPrime':
+            return ('builtin', lambda args, ctx: (lambda n, ip, np, pp: ip(n) and n > (pp(n) + np(n)) / 2)(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)), lambda n: next(p for p in range(n+1, n*2) if all(p % i for i in range(2, int(p**0.5)+1))), lambda n: next(p for p in range(n-1, 1, -1) if all(p % i for i in range(2, int(p**0.5)+1)))))
         raise RuntimeError_(f"'number' has no member '{member}'")
 
     def _eval_method(self, obj: Any, method: str, args: list, env: 'Environment | None' = None) -> Any:
