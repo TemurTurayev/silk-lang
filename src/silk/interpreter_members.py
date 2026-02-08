@@ -222,8 +222,8 @@ class MemberMixin:
         if member in ('toTypeScript', 'toGraphQLSchema'):
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
-        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream'):
-            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};'}[member]
+        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream', 'toFluentBitConfig'):
+            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};', 'toFluentBitConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
@@ -445,6 +445,7 @@ class MemberMixin:
                 return ('builtin', lambda args, ctx: [self._call_function(args[1], obj[i:i+int(args[0])]) for i in range(len(obj) - int(args[0]) + 1)])
             return ('builtin', lambda args, ctx: [self._call_function(args[1], obj[i:i+int(args[0])]) for i in range(0, len(obj), int(args[0]))])
         if member == 'mapWhere': return ('builtin', lambda args, ctx: [self._call_function(args[1], [x]) if self._call_function(args[0], [x]) else x for x in obj])
+        if member == 'mapExcept': return ('builtin', lambda args, ctx: [obj[i] if i in args[0] else self._call_function(args[1], [obj[i]]) for i in range(len(obj))])
         if member in ('mapSkip', 'mapTake'):
             return ('builtin', lambda args, ctx: [(obj[i] if i < int(args[0]) else self._call_function(args[1], [obj[i]])) if member == 'mapSkip' else (self._call_function(args[1], [obj[i]]) if i < int(args[0]) else obj[i]) for i in range(len(obj))])
         raise RuntimeError_(f"'list' has no member '{member}'")
@@ -505,7 +506,7 @@ class MemberMixin:
             'toPolybius': lambda: ' '.join((lambda p: f'{p//5+1}{p%5+1}')((lambda c: ord(c)-ord('a') if c < 'k' else ord(c)-ord('a')-1)(c)) for c in obj.lower().replace('k','c') if c.isalpha()),
             'toBacon': lambda: ' '.join(bin(ord(c) - ord('a'))[2:].zfill(5).replace('0', 'A').replace('1', 'B') for c in obj.lower() if c.isalpha()),
             'toSemaphore': lambda: ' '.join(str(ord(c) - ord('a') + 1) for c in obj.lower() if c.isalpha()), 'toASCIIArt': lambda: ' '.join(str(ord(c)) for c in obj),
-            'toBinary': lambda: ' '.join(format(ord(c), '08b') for c in obj), 'toOctal': lambda: ' '.join(format(ord(c), 'o') for c in obj), 'toDecimal': lambda: ','.join(str(ord(c)) for c in obj),
+            'toBinary': lambda: ' '.join(format(ord(c), '08b') for c in obj), 'toOctal': lambda: ' '.join(format(ord(c), 'o') for c in obj), 'toDecimal': lambda: ','.join(str(ord(c)) for c in obj), 'toUnicodeEscape': lambda: ''.join(f'\\u{ord(c):04x}' for c in obj),
         }
         if member == 'toMorse': member = 'toMorseCode'
         if member in _noarg:
@@ -711,7 +712,7 @@ class MemberMixin:
             'sumOfDigitsPower': lambda a: sum(int(d) ** int(a[0]) for d in str(abs(int(obj)))),
             'stirling': lambda a: (lambda n, k: sum((-1)**(k-j) * math.comb(k, j) * j**n for j in range(k+1)) // math.factorial(k))(int(obj), int(a[0])),
             'centered': lambda a: int(a[0]) * int(obj) * (int(obj) - 1) // 2 + 1,
-            'polygonal': lambda a: int(obj) * ((int(a[0]) - 2) * int(obj) - (int(a[0]) - 4)) // 2,
+            'polygonal': lambda a: int(obj) * ((int(a[0]) - 2) * int(obj) - (int(a[0]) - 4)) // 2, 'nthDigit': lambda a: int(str(abs(int(obj)))[int(a[0])]),
         }
         if member in _onearg:
             fn = _onearg[member]
