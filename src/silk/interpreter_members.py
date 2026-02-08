@@ -223,7 +223,7 @@ class MemberMixin:
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
         if member == 'toKafkaConfig': member = 'toZookeeperConfig'
-        if member in ('toRabbitmqConfig', 'toElasticConfig', 'toMysqlConfig', 'toMongoConfig', 'toCouchDBConfig', 'toInfluxDBConfig'): member = {'toRabbitmqConfig': 'toGrafanaConfig', 'toElasticConfig': 'toConsulKV', 'toMysqlConfig': 'toGrafanaConfig', 'toMongoConfig': 'toConsulKV', 'toCouchDBConfig': 'toGrafanaConfig', 'toInfluxDBConfig': 'toGrafanaConfig'}[member]
+        if member in ('toRabbitmqConfig', 'toElasticConfig', 'toMysqlConfig', 'toMongoConfig', 'toCouchDBConfig', 'toInfluxDBConfig', 'toNeo4jConfig'): member = {'toRabbitmqConfig': 'toGrafanaConfig', 'toElasticConfig': 'toConsulKV', 'toMysqlConfig': 'toGrafanaConfig', 'toMongoConfig': 'toConsulKV', 'toCouchDBConfig': 'toGrafanaConfig', 'toInfluxDBConfig': 'toGrafanaConfig', 'toNeo4jConfig': 'toZookeeperConfig'}[member]
         if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV', 'toEtcdConfig', 'toDockerCompose', 'toKubernetesYAML', 'toGrafanaConfig', 'toRedisConfig', 'toNginxUpstream', 'toFluentBitConfig', 'toLogstashConfig', 'toSentinelConfig', 'toHAProxyConfig', 'toVarnishConfig', 'toEnvoyConfig', 'toTraefikConfig', 'toCaddyConfig', 'toZookeeperConfig', 'toMemcachedConfig', 'toPostgresConfig', 'toRedisClusterConfig'):
             _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toEtcdConfig': lambda k, v: f'/{k} {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toDockerCompose': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toKubernetesYAML': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}', 'toGrafanaConfig': lambda k, v: f'{k} = {v if isinstance(v, str) else silk_repr(v)}', 'toRedisConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toNginxUpstream': lambda k, v: f'server {v if isinstance(v, str) else silk_repr(v)};', 'toFluentBitConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toLogstashConfig': lambda k, v: f'{k} => {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toSentinelConfig': lambda k, v: f'sentinel {k} {v if isinstance(v, str) else silk_repr(v)}', 'toHAProxyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toVarnishConfig': lambda k, v: f'set {k} = {json.dumps(v) if isinstance(v, str) else silk_repr(v)};', 'toEnvoyConfig': lambda k, v: f'{k}: {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toTraefikConfig': lambda k, v: f'[{k}]\n  value = {json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toCaddyConfig': lambda k, v: f'{k} {v if isinstance(v, str) else silk_repr(v)}', 'toZookeeperConfig': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toMemcachedConfig': lambda k, v: f'-{k} {v if isinstance(v, str) else silk_repr(v)}', 'toPostgresConfig': lambda k, v: f"{k} = '{v}'" if isinstance(v, str) else f'{k} = {silk_repr(v)}', 'toRedisClusterConfig': lambda k, v: f'cluster-{k} {v if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
@@ -375,8 +375,7 @@ class MemberMixin:
         if member == 'mapWhileIndexed': return ('builtin', lambda args, ctx: list(__import__('itertools').takewhile(lambda v: v is not False, (self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))))
         if member in ('noneIndexed', 'everyIndexed', 'someIndexed'): return ('builtin', lambda args, ctx, fn={'noneIndexed': lambda g: not any(g), 'everyIndexed': all, 'someIndexed': any}[member]: fn(self._call_function(args[0], [i, x]) for i, x in enumerate(obj)))
         if member == 'flatMapIndexed': return ('builtin', lambda args, ctx: [y for i, x in enumerate(obj) for y in (lambda m: m if isinstance(m, list) else [m])(self._call_function(args[0], [i, x]))])
-        if member == 'reduceIndexed':
-            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, ix: self._call_function(args[0], [acc, ix[0], ix[1]]), enumerate(obj), args[1]))
+        if member == 'reduceIndexed': return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, ix: self._call_function(args[0], [acc, ix[0], ix[1]]), enumerate(obj), args[1]))
         if member in ('filterIndexed', 'filterMapIndexed'): return ('builtin', lambda args, ctx: [x for i, x in enumerate(obj) if self._call_function(args[0], [i, x])])
         if member == 'groupByCount': return ('builtin', lambda args, ctx: (lambda n, s: [obj[i*s:(i+1)*s] for i in range(n)])(int(args[0]), len(obj) // int(args[0])))
         if member == 'uniqueBy': return ('builtin', lambda args, ctx: (lambda s: [x for x in obj if (k := self._call_function(args[0], [x])) not in s and not s.add(k)])(set()))
@@ -385,10 +384,8 @@ class MemberMixin:
         if member in ('mapAccum', 'mapAccumRight'): return ('builtin', lambda args, ctx: (lambda: (r := [[], args[1]]) and [r.__setitem__(1, (p := self._call_function(args[0], [r[1], x]))[1]) or r[0].append(p[0]) for x in (reversed(obj) if member == 'mapAccumRight' else obj)] and ([r[0][::-1], r[1]] if member == 'mapAccumRight' else r))())
         if member == 'toDict': return ('builtin', lambda args, ctx: dict(zip(obj, args[0])))
         if member == 'weightedAverage': return ('builtin', lambda args, ctx: (lambda r: int(r) if r == int(r) else r)(sum(v*w for v, w in zip(obj, args[0])) / sum(args[0])))
-        if member in ('foldRight', 'reduceRight'):
-            return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, x: self._call_function(args[0], [acc, x]), reversed(obj), args[1]))
-        if member == 'reduceWhile':
-            return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [((s.__setitem__(0, r) or True) if (r := self._call_function(args[1], [s[0], x])) is not False else None) for x in obj] and s[0])())
+        if member in ('foldRight', 'reduceRight'): return ('builtin', lambda args, ctx: __import__('functools').reduce(lambda acc, x: self._call_function(args[0], [acc, x]), reversed(obj), args[1]))
+        if member == 'reduceWhile': return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [((s.__setitem__(0, r) or True) if (r := self._call_function(args[1], [s[0], x])) is not False else None) for x in obj] and s[0])())
         if member in ('unfold', 'iterate'): return ('builtin', lambda args, ctx: (lambda s, fn, n: (r := [s]) and [r.append(fn(r[-1])) for _ in range(n-1)] and r)(args[0], lambda x: self._call_function(args[1], [x]), int(args[2])))
         if member == 'mapEvery': return ('builtin', lambda args, ctx: [self._call_function(args[1], [x]) if (i+1) % int(args[0]) == 0 else x for i, x in enumerate(obj)])
         if member in ('takeWhileRight', 'dropWhileRight'): return ('builtin', lambda args, ctx: (lambda r: list(reversed(r)) if member == 'takeWhileRight' else obj[:len(obj)-len(r)])(list(__import__('itertools').takewhile(lambda x: self._call_function(args[0], [x]), reversed(obj)))))
@@ -418,6 +415,7 @@ class MemberMixin:
         if member == 'mapZipWith': return ('builtin', lambda args, ctx: [[a, b] for a, b in zip(obj, args[0])])
         if member == 'mapWindow': return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(len(obj)-int(args[0])+1)])
         if member == 'mapChunkEvery': return ('builtin', lambda args, ctx: [obj[i:i+int(args[0])] for i in range(0, len(obj), int(args[0]))])
+        if member == 'mapRotate': return ('builtin', lambda args, ctx: (lambda n: obj[n:] + obj[:n])(int(args[0]) % len(obj) if obj else 0))
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -493,6 +491,7 @@ class MemberMixin:
             'toAbbreviation': lambda: ''.join(w[0].upper() for w in obj.split() if w),
             'toInitials': lambda: '.'.join(w[0].upper() for w in obj.split() if w) + '.',
             'toSlugCase': lambda: '-'.join(w.lower() for w in __import__('re').split(r'[\s_\-]+', obj)),
+            'toHeaderCase': lambda: '-'.join(w.capitalize() for w in __import__('re').split(r'[\s_\-]+', obj)),
         }
         if member == 'toMorse': member = 'toMorseCode'
         if member in _noarg:
@@ -691,6 +690,7 @@ class MemberMixin:
             'isOctagonal': lambda: (lambda n, d: d >= 0 and int(d**0.5)**2 == d and (2+int(d**0.5)) % 6 == 0)(int(obj), 4+12*int(obj)),
             'isNonagonal': lambda: (lambda n, d: d >= 0 and int(d**0.5)**2 == d and (5+int(d**0.5)) % 14 == 0)(int(obj), 25+56*int(obj)),
             'isPowerful': lambda: (lambda n: n > 0 and any(n % (b**3) == 0 and int((n//(b**3))**0.5)**2 == n//(b**3) for b in range(1, int(n**(1/3))+2)))(int(obj)),
+            'isAchilles': lambda: (lambda n: n > 1 and any(n % (b**3) == 0 and int((n//(b**3))**0.5)**2 == n//(b**3) for b in range(1, int(n**(1/3))+2)) and not any(round(n**(1/k)) ** k == n for k in range(2, int(n.bit_length())+1)))(int(obj)),
         }
         if member == 'isEconomical': member = 'isFrugal'
         if member in _simple:
