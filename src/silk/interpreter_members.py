@@ -222,8 +222,8 @@ class MemberMixin:
         if member in ('toTypeScript', 'toGraphQLSchema'):
             _tf = lambda v: ("boolean" if isinstance(v, bool) else "string" if isinstance(v, str) else "number" if isinstance(v, (int, float)) else "any") if member == 'toTypeScript' else ("Boolean" if isinstance(v, bool) else "String" if isinstance(v, str) else ("Int" if isinstance(v, int) else "Float") if isinstance(v, (int, float)) else "Any")
             return ('builtin', lambda args, ctx, tf=_tf: ('interface Data { ' + ' '.join(f'{k}: {tf(v)};' for k, v in obj.items()) + ' }') if member == 'toTypeScript' else ('type Data { ' + ' '.join(f'{k}: {tf(v)}' for k, v in obj.items()) + ' }'))
-        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit'):
-            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}'}[member]
+        if member in ('toDockerEnv', 'toMakefileVars', 'toAnsibleYAML', 'toSystemdUnit', 'toConsulKV'):
+            _fmt = {'toDockerEnv': lambda k, v: f'ENV {k}={json.dumps(v) if isinstance(v, str) else silk_repr(v)}', 'toMakefileVars': lambda k, v: f'{k} := {v if isinstance(v, str) else silk_repr(v)}', 'toAnsibleYAML': lambda k, v: f'- {k}: {v if isinstance(v, str) else silk_repr(v)}', 'toSystemdUnit': lambda k, v: f'{k}={v if isinstance(v, str) else silk_repr(v)}', 'toConsulKV': lambda k, v: f'{k}: {v if isinstance(v, str) else silk_repr(v)}'}[member]
             return ('builtin', lambda args, ctx, f=_fmt: '\n'.join(f(k, v) for k, v in obj.items()))
         raise RuntimeError_(f"'dict' has no member '{member}'")
 
@@ -456,6 +456,8 @@ class MemberMixin:
             return ('builtin', lambda args, ctx: (lambda: (s := [args[0]]) and [s.append(self._call_function(args[1], [s[-1], x])) for x in obj] and s[1:])())
         if member == 'foldMap':
             return ('builtin', lambda args, ctx: sum(self._call_function(args[0], [x]) for x in obj))
+        if member == 'mapUntil':
+            return ('builtin', lambda args, ctx: (lambda: (s := [False]) and [(x if s[0] else (s.__setitem__(0, True) or x) if self._call_function(args[0], [x]) else self._call_function(args[1], [x])) for x in obj])())
         raise RuntimeError_(f"'list' has no member '{member}'")
 
     def _eval_string_member(self, obj: str, member: str) -> Any:
@@ -476,14 +478,10 @@ class MemberMixin:
             'isUpper': lambda: len(obj) > 0 and obj.isupper(), 'isLower': lambda: len(obj) > 0 and obj.islower(),
             'isBlank': lambda: len(obj.strip()) == 0, 'isAlphanumeric': lambda: len(obj) > 0 and obj.isalnum(),
             'rot13': lambda: ''.join(chr((ord(c) - (65 if c.isupper() else 97) + 13) % 26 + (65 if c.isupper() else 97)) if c.isalpha() else c for c in obj), 'isPalindrome': lambda: obj == obj[::-1],
-            'wordCount': lambda: len(obj.split()) if obj.strip() else 0,
-            'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'codePoints': lambda: [ord(c) for c in obj], 'toCharCodes': lambda: [ord(c) for c in obj],
-            'isHexColor': lambda: bool(__import__('re').match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', obj)),
-            'normalize': lambda: ' '.join(obj.split()),
-            'isIPv4': lambda: len(p := obj.split('.')) == 4 and all(s.isdigit() and 0 <= int(s) <= 255 for s in p),
-            'isPangram': lambda: set('abcdefghijklmnopqrstuvwxyz').issubset(obj.lower()),
-            'collapseWhitespace': lambda: ' '.join(obj.split()),
-            'reverseWords': lambda: ' '.join(obj.split()[::-1]),
+            'wordCount': lambda: len(obj.split()) if obj.strip() else 0, 'initials': lambda: ''.join(w[0].upper() for w in obj.split() if w), 'codePoints': lambda: [ord(c) for c in obj], 'toCharCodes': lambda: [ord(c) for c in obj],
+            'isHexColor': lambda: bool(__import__('re').match(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$', obj)), 'normalize': lambda: ' '.join(obj.split()),
+            'isIPv4': lambda: len(p := obj.split('.')) == 4 and all(s.isdigit() and 0 <= int(s) <= 255 for s in p), 'isPangram': lambda: set('abcdefghijklmnopqrstuvwxyz').issubset(obj.lower()),
+            'collapseWhitespace': lambda: ' '.join(obj.split()), 'reverseWords': lambda: ' '.join(obj.split()[::-1]),
             'trimLines': lambda: '\n'.join(l.strip() for l in obj.split('\n')),
             'removeDuplicateChars': lambda: ''.join(obj[i] for i in range(len(obj)) if i == 0 or obj[i] != obj[i-1]),
             'toAcronym': lambda: ''.join(w[0].upper() for w in obj.split() if w),
@@ -527,6 +525,7 @@ class MemberMixin:
             'toPhonetic': lambda: '-'.join(c for c in obj.lower() if c.isalpha()), 'toAtbash': lambda: ''.join(chr(219 - ord(c)) if 'a' <= c <= 'z' else chr(155 - ord(c)) if 'A' <= c <= 'Z' else c for c in obj),
             'toA1Z26': lambda: '-'.join(str(ord(c) - 96) for c in obj.lower() if c.isalpha()),
             'toTapCode': lambda: ' '.join((lambda p: f'{p//5+1},{p%5+1}')((lambda c: ord(c)-ord('a') if c < 'k' else ord(c)-ord('a')-1)(c)) for c in obj.lower().replace('k','c') if c.isalpha()),
+            'toPolybius': lambda: ' '.join((lambda p: f'{p//5+1}{p%5+1}')((lambda c: ord(c)-ord('a') if c < 'k' else ord(c)-ord('a')-1)(c)) for c in obj.lower().replace('k','c') if c.isalpha()),
         }
         if member in _noarg:
             fn = _noarg[member]
@@ -695,6 +694,7 @@ class MemberMixin:
             'isRegular': lambda: (lambda n, pf: n >= 1 and all(p in (2,3,5) for p in set(pf)))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
             'isSquareFree': lambda: (lambda n: n >= 1 and all(n % (i*i) != 0 for i in range(2, int(n**0.5)+1)))(int(obj)),
             'isPractical': lambda: (lambda n: n >= 1 and (lambda ds: all(k <= 1 + sum(d for d in ds if d <= k) for k in range(1, n+1)))([i for i in range(1, n) if n % i == 0]))(int(obj)),
+            'isHumble': lambda: (lambda n, pf: n >= 1 and all(p in (2,3,5,7) for p in set(pf)))(int(obj), (lambda f, n: f(f, n, 2))(lambda s, n, d: [] if n <= 1 else [d] + s(s, n//d, d) if n % d == 0 else s(s, n, d+1), int(obj))),
         }
         if member in _simple:
             fn = _simple[member]
