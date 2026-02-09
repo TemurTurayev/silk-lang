@@ -1,0 +1,21 @@
+"""
+Tests for array .mapBitAlign19342813113834066795298816() method - align up to nearest multiple of 19342813113834066795298816.
+"""
+
+from silk.interpreter import Interpreter
+
+
+class TestArrayMapBitAlign19342813113834066795298816:
+
+    def _run(self, source):
+        interp = Interpreter()
+        interp.run(source)
+        return interp.output_lines
+
+    def test_mapBitAlign19342813113834066795298816_basic(self):
+        output = self._run('print([0, 1, 9671406556917033397649407, 9671406556917033397649408, 19342813113834066795298816].mapBitAlign19342813113834066795298816())')
+        assert output[-1] == '[0, 19342813113834066795298816, 19342813113834066795298816, 19342813113834066795298816, 19342813113834066795298816]'
+
+    def test_mapBitAlign19342813113834066795298816_exact(self):
+        output = self._run('print([38685626227668133590597632, 58028439341502200385896448].mapBitAlign19342813113834066795298816())')
+        assert output[-1] == '[38685626227668133590597632, 58028439341502200385896448]'
