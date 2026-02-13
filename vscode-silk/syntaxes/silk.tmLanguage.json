@@ -4,12 +4,16 @@
   "scopeName": "source.silk",
   "patterns": [
     { "include": "#comments" },
+    { "include": "#fstrings" },
+    { "include": "#triple-strings" },
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#keywords" },
     { "include": "#types" },
+    { "include": "#constructors" },
     { "include": "#functions" },
     { "include": "#medical-functions" },
+    { "include": "#lambdas" },
     { "include": "#operators" },
     { "include": "#punctuation" }
   ],
@@ -24,6 +28,87 @@
           "name": "comment.block.silk",
           "begin": "/\\*",
           "end": "\\*/"
+        }
+      ]
+    },
+    "fstrings": {
+      "patterns": [
+        {
+          "name": "string.interpolated.silk",
+          "begin": "f\"",
+          "end": "\"",
+          "beginCaptures": {
+            "0": { "name": "string.quoted.double.silk punctuation.definition.string.begin.silk" }
+          },
+          "endCaptures": {
+            "0": { "name": "string.quoted.double.silk punctuation.definition.string.end.silk" }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.silk",
+              "match": "\\\\."
+            },
+            {
+              "name": "meta.embedded.expression.silk",
+              "begin": "\\{",
+              "end": "\\}",
+              "beginCaptures": {
+                "0": { "name": "punctuation.section.embedded.begin.silk" }
+              },
+              "endCaptures": {
+                "0": { "name": "punctuation.section.embedded.end.silk" }
+              },
+              "patterns": [
+                { "include": "source.silk" }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "string.interpolated.silk",
+          "begin": "f'",
+          "end": "'",
+          "beginCaptures": {
+            "0": { "name": "string.quoted.single.silk punctuation.definition.string.begin.silk" }
+          },
+          "endCaptures": {
+            "0": { "name": "string.quoted.single.silk punctuation.definition.string.end.silk" }
+          },
+          "patterns": [
+            {
+              "name": "constant.character.escape.silk",
+              "match": "\\\\."
+            },
+            {
+              "name": "meta.embedded.expression.silk",
+              "begin": "\\{",
+              "end": "\\}",
+              "beginCaptures": {
+                "0": { "name": "punctuation.section.embedded.begin.silk" }
+              },
+              "endCaptures": {
+                "0": { "name": "punctuation.section.embedded.end.silk" }
+              },
+              "patterns": [
+                { "include": "source.silk" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "triple-strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.silk",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.silk",
+              "match": "\\\\."
+            }
+          ]
         }
       ]
     },
@@ -69,11 +154,23 @@
       "patterns": [
         {
           "name": "keyword.control.silk",
-          "match": "\\b(if|elif|else|while|for|in|break|continue|return)\\b"
+          "match": "\\b(if|elif|else|while|for|in|break|continue|return|do|repeat|loop|guard|unless)\\b"
         },
         {
           "name": "keyword.declaration.silk",
-          "match": "\\b(let|mut|fn)\\b"
+          "match": "\\b(let|mut|fn|const)\\b"
+        },
+        {
+          "name": "keyword.declaration.type.silk",
+          "match": "\\b(struct|enum|match|impl|interface)\\b"
+        },
+        {
+          "name": "keyword.control.exception.silk",
+          "match": "\\b(try|catch|throw)\\b"
+        },
+        {
+          "name": "keyword.other.testing.silk",
+          "match": "\\b(test|assert)\\b"
         },
         {
           "name": "keyword.operator.logical.silk",
@@ -89,7 +186,11 @@
         },
         {
           "name": "keyword.other.import.silk",
-          "match": "\\b(import)\\b"
+          "match": "\\b(import|as)\\b"
+        },
+        {
+          "name": "variable.language.self.silk",
+          "match": "\\b(self)\\b"
         }
       ]
     },
@@ -97,7 +198,15 @@
       "patterns": [
         {
           "name": "support.type.silk",
-          "match": "\\b(int|float|str|bool|array)\\b"
+          "match": "\\b(int|float|str|bool|array|map|Option|Result)\\b"
+        }
+      ]
+    },
+    "constructors": {
+      "patterns": [
+        {
+          "name": "support.constant.silk",
+          "match": "\\b(Some|None|Ok|Err)\\b"
         }
       ]
     },
@@ -109,7 +218,7 @@
         },
         {
           "name": "support.function.builtin.silk",
-          "match": "\\b(print|input|type|str|int|float|bool|len|range|push|pop|slice|reverse|sort|join|split|contains|map|filter)\\b"
+          "match": "\\b(print|input|type|typeof|str|int|float|bool|len|range|push|pop|shift|unshift|slice|reverse|sort|join|split|contains|indexOf|map|filter|find|reduce|forEach|zip|flatten)\\b"
         },
         {
           "name": "support.function.math.silk",
@@ -125,23 +234,58 @@
         }
       ]
     },
+    "lambdas": {
+      "patterns": [
+        {
+          "name": "meta.lambda.silk",
+          "match": "\\|([a-zA-Z_][a-zA-Z0-9_]*(\\s*,\\s*[a-zA-Z_][a-zA-Z0-9_]*)*)\\|",
+          "captures": {
+            "1": { "name": "variable.parameter.silk" }
+          }
+        }
+      ]
+    },
     "operators": {
       "patterns": [
+        {
+          "name": "keyword.operator.match-arm.silk",
+          "match": "=>"
+        },
+        {
+          "name": "keyword.operator.pipe.silk",
+          "match": "\\|>"
+        },
+        {
+          "name": "keyword.operator.arrow.silk",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.optional-chain.silk",
+          "match": "\\?\\."
+        },
+        {
+          "name": "keyword.operator.null-coalesce.silk",
+          "match": "\\?\\?"
+        },
+        {
+          "name": "keyword.operator.spread.silk",
+          "match": "\\.\\.\\."
+        },
+        {
+          "name": "keyword.operator.range.silk",
+          "match": "\\.\\."
+        },
         {
           "name": "keyword.operator.comparison.silk",
           "match": "(==|!=|<=|>=|<|>)"
         },
         {
           "name": "keyword.operator.assignment.silk",
-          "match": "(\\+=|-=|\\*=|/=|=)"
+          "match": "(\\+=|-=|\\*=|/=|%=|=)"
         },
         {
           "name": "keyword.operator.arithmetic.silk",
           "match": "(\\+|-|\\*\\*|\\*|/|%)"
-        },
-        {
-          "name": "keyword.operator.arrow.silk",
-          "match": "->"
         }
       ]
     },
