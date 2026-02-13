@@ -230,7 +230,7 @@
       "patterns": [
         {
           "name": "support.function.medical.silk",
-          "match": "\\b(bmi|bsa|dose_per_kg|ideal_body_weight|celsius_to_fahrenheit|fahrenheit_to_celsius|mean|median|stdev)\\b"
+          "match": "\\b(bmi|bsa|dose_per_kg|dose_per_bsa|ideal_body_weight|bmi_category|celsius_to_fahrenheit|fahrenheit_to_celsius|creatinine_clearance|egfr|pediatric_dose|pediatric_bsa_dose|pediatric_maintenance_fluid|iv_drip_rate|concentration|dilution|map_pressure|corrected_qt|anion_gap|corrected_sodium|corrected_calcium|mean|median|stdev)\\b"
         }
       ]
     },

@@ -264,25 +264,71 @@ let age = 8
 print(f"Patient {name} is {age} years old")
 ```
 
+### Decimal Type (Precise Arithmetic)
+
+Float arithmetic is dangerous for medical dosing (`0.1 + 0.2 != 0.3`). Use `decimal` for exact results:
+
+```silk
+let a = decimal("0.1")
+let b = decimal("0.2")
+print(a + b)                    // exactly 0.3 (not 0.30000000000000004)
+
+let dose = decimal("15.75") * decimal("25")
+print(dose)                     // exactly 393.75 mg
+
+print(decimal("3.14159").round(2))  // 3.14
+```
+
+### Unit Safety
+
+Prevents dangerous unit mismatches — adding milligrams to milliliters is a compile error:
+
+```silk
+let dose = unit(500, "mg")
+let volume = unit(100, "mL")
+// dose + volume -> ERROR: cannot add 'mg' and 'mL' (mass vs volume)
+
+let a = unit(500, "mg")
+let b = unit(1, "g")
+print(a + b)                    // 1500 mg (auto-converted)
+
+let in_grams = dose.convertTo("g")
+print(in_grams)                 // 0.5 g
+```
+
+Supported units: `kg`, `g`, `mg`, `mcg`, `L`, `mL`, `dL`, `m`, `cm`, `mm`, `hr`, `min`, `sec`, `C`, `F`, `bpm`, `mmHg`, `%`, `IU`, `mEq`, `mmol`, `mg/kg`, `mg/mL`, `mL/hr`, and more.
+
 ## Built-in Functions
 
 | Category | Functions |
 |----------|-----------|
 | **I/O** | `print()`, `input()` |
-| **Types** | `type()`, `typeof()`, `str()`, `int()`, `float()`, `bool()` |
+| **Types** | `type()`, `typeof()`, `str()`, `int()`, `float()`, `decimal()`, `unit()`, `bool()` |
 | **Collections** | `len()`, `range()`, `push()`, `pop()`, `shift()`, `unshift()`, `sort()`, `reverse()` |
 | **Array Ops** | `map()`, `filter()`, `find()`, `reduce()`, `forEach()`, `zip()`, `flatten()`, `contains()`, `indexOf()` |
 | **String Ops** | `join()`, `split()`, `trim()`, `replace()`, `toUpperCase()`, `toLowerCase()` |
 | **Math** | `abs()`, `round()`, `min()`, `max()`, `sum()`, `sqrt()`, `pow()`, `ceil()`, `floor()`, `pi()` |
 | **Trig** | `sin()`, `cos()`, `tan()`, `log()`, `log10()` |
 | **Statistics** | `mean()`, `median()`, `stdev()` |
-| **Medical** | `bmi()`, `bsa()`, `dose_per_kg()`, `ideal_body_weight()`, `celsius_to_fahrenheit()`, `fahrenheit_to_celsius()` |
+| **Precision** | `decimal()` (exact arithmetic), `unit()` (physical units with safety) |
+| **Medical** | 25 functions — see below |
 
-## Medical Functions
+## Medical Functions (25)
 
 All medical functions compute only — they do not diagnose or recommend treatment.
 
 > **Disclaimer:** Results require clinical interpretation. Not medical advice.
+
+| Category | Functions |
+|----------|-----------|
+| **Anthropometric** | `bmi()`, `bsa()`, `ideal_body_weight()`, `bmi_category()` |
+| **Renal** | `creatinine_clearance()`, `egfr()` |
+| **Pediatric** | `pediatric_dose()`, `pediatric_bsa_dose()`, `pediatric_maintenance_fluid()` |
+| **Dosing** | `dose_per_kg()`, `dose_per_bsa()`, `iv_drip_rate()`, `concentration()`, `dilution()` |
+| **Temperature** | `celsius_to_fahrenheit()`, `fahrenheit_to_celsius()` |
+| **Cardiovascular** | `map_pressure()`, `corrected_qt()` |
+| **Lab Values** | `anion_gap()`, `corrected_sodium()`, `corrected_calcium()` |
+| **Statistics** | `mean()`, `median()`, `stdev()` |
 
 ```silk
 // Body Mass Index (kg/m^2)
