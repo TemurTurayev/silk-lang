@@ -13,7 +13,7 @@ from typing import Any
 from .errors import RuntimeError_
 from .builtins.core import silk_repr
 from .types import (
-    Environment, SilkStruct, SilkEnumValue, SilkDecimal,
+    Environment, SilkStruct, SilkEnumValue, SilkDecimal, SilkUnit,
 )
 
 
@@ -26,6 +26,8 @@ class MemberMixin:
             return "null"
         if isinstance(val, bool):
             return "bool"
+        if isinstance(val, SilkUnit):
+            return "unit"
         if isinstance(val, SilkDecimal):
             return "decimal"
         if isinstance(val, int):
@@ -66,6 +68,9 @@ class MemberMixin:
 
         if isinstance(obj, str):
             return self._eval_string_member(obj, member)
+
+        if isinstance(obj, SilkUnit):
+            return self._eval_unit_member(obj, member)
 
         if isinstance(obj, SilkDecimal):
             return self._eval_decimal_member(obj, member)
@@ -790,6 +795,24 @@ class MemberMixin:
         if member == 'asTime': return ('builtin', lambda args, ctx: (lambda n, h, m, s: f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}")(int(obj), int(obj) // 3600, (int(obj) % 3600) // 60, int(obj) % 60))
         if member in ('isStrongPrime', 'isWeakPrime', 'isBalancedPrime'): return ('builtin', lambda args, ctx: (lambda n, ip, np, pp, avg: ip(n) and (n > avg if member == 'isStrongPrime' else n < avg if member == 'isWeakPrime' else n * 2 == pp(n) + np(n)))(int(obj), lambda n: n >= 2 and all(n % i for i in range(2, int(n**0.5)+1)), lambda n: next(p for p in range(n+1, n*2) if all(p % i for i in range(2, int(p**0.5)+1))), lambda n: next(p for p in range(n-1, 1, -1) if all(p % i for i in range(2, int(p**0.5)+1))), (lambda pp, np: (pp(int(obj)) + np(int(obj))) / 2)(lambda n: next(p for p in range(n-1, 1, -1) if all(p % i for i in range(2, int(p**0.5)+1))), lambda n: next(p for p in range(n+1, n*2) if all(p % i for i in range(2, int(p**0.5)+1))))))
         raise RuntimeError_(f"'number' has no member '{member}'")
+
+    def _eval_unit_member(self, obj: SilkUnit, member: str) -> Any:
+        """Evaluate member access on a unit value."""
+        if member == 'value':
+            return obj.value
+        if member == 'unit':
+            return obj.unit
+        if member == 'dimension':
+            return obj.dimension
+        if member == 'convertTo':
+            return ('builtin', lambda args, ctx: obj.convert_to(args[0]))
+        if member == 'round':
+            return ('builtin', lambda args, ctx: SilkUnit(
+                round(obj.value, int(args[0]) if args else 0), obj.unit
+            ))
+        if member == 'abs':
+            return ('builtin', lambda args, ctx: SilkUnit(abs(obj.value), obj.unit))
+        raise RuntimeError_(f"'unit' has no member '{member}'")
 
     def _eval_decimal_member(self, obj: SilkDecimal, member: str) -> Any:
         """Evaluate member access on a decimal value."""

@@ -14,6 +14,12 @@ def silk_repr(value: Any) -> str:
         return "null"
     if isinstance(value, bool):
         return "true" if value else "false"
+    # SilkUnit (duck-typed to avoid circular import)
+    if hasattr(value, 'unit') and hasattr(value, 'dimension') and hasattr(value, 'convert_to'):
+        v = value.value
+        if v == int(v):
+            return f"{int(v)} {value.unit}"
+        return f"{v} {value.unit}"
     # SilkDecimal (duck-typed to avoid circular import)
     if hasattr(value, 'raw') and hasattr(value, 'round') and not isinstance(value, type):
         return str(value.raw)
@@ -85,6 +91,9 @@ def builtin_type(args: list, context: dict) -> str:
         return "int"
     elif isinstance(v, float):
         return "float"
+    # SilkUnit (duck-typed)
+    elif hasattr(v, 'unit') and hasattr(v, 'dimension') and hasattr(v, 'convert_to'):
+        return "unit"
     # SilkDecimal (duck-typed to avoid circular import)
     elif hasattr(v, 'raw') and hasattr(v, 'round') and not isinstance(v, type):
         return "decimal"
@@ -262,6 +271,26 @@ def builtin_err(args: list, context: dict) -> Any:
     return SilkResult(error=args[0], is_ok=False)
 
 
+def builtin_unit(args: list, context: dict) -> Any:
+    """Create a value with a physical unit.
+
+    unit(500, "mg")     -> 500 mg
+    unit(70, "kg")      -> 70 kg
+    unit(1.5, "mL")     -> 1.5 mL
+    """
+    from ..types import SilkUnit
+    if len(args) != 2:
+        raise RuntimeError_(
+            "unit() takes exactly 2 arguments: unit(value, unit_name)"
+        )
+    value, unit_name = args
+    if not isinstance(unit_name, str):
+        raise RuntimeError_(
+            f"unit() second argument must be a string, got {type(unit_name).__name__}"
+        )
+    return SilkUnit(value, unit_name)
+
+
 def builtin_decimal(args: list, context: dict) -> Any:
     """Create a precise decimal value for medical calculations.
 
@@ -302,6 +331,7 @@ CORE_BUILTINS: dict[str, Callable] = {
     'int': builtin_int,
     'float': builtin_float,
     'decimal': builtin_decimal,
+    'unit': builtin_unit,
     'bool': builtin_bool,
     'len': builtin_len,
     'range': builtin_range,

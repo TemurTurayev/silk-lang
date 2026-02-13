@@ -332,6 +332,244 @@ class SilkDecimal:
 # HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════
 
+# ═══════════════════════════════════════════════════════════
+# UNIT TYPE (medical unit safety)
+# ═══════════════════════════════════════════════════════════
+
+# Units organized by dimension. Units in the same dimension can convert
+# to each other; units in different dimensions cannot be mixed.
+UNIT_DIMENSIONS: dict[str, str] = {
+    # Mass
+    'kg': 'mass', 'g': 'mass', 'mg': 'mass', 'mcg': 'mass', 'ug': 'mass',
+    # Volume
+    'L': 'volume', 'mL': 'volume', 'dL': 'volume',
+    # Length
+    'm': 'length', 'cm': 'length', 'mm': 'length',
+    # Temperature
+    'C': 'temperature', 'F': 'temperature',
+    # Time
+    'hr': 'time', 'min': 'time', 'sec': 'time',
+    # Dosing (compound units)
+    'mg/kg': 'dose_per_mass', 'mcg/kg': 'dose_per_mass',
+    'mg/mL': 'concentration', 'mcg/mL': 'concentration', 'g/L': 'concentration',
+    'mL/hr': 'flow_rate', 'L/hr': 'flow_rate',
+    'bpm': 'heart_rate', 'mmHg': 'pressure',
+    '%': 'percentage',
+    'IU': 'international_unit', 'mIU': 'international_unit',
+    'mEq': 'equivalent', 'mEq/L': 'eq_concentration',
+    'mmol': 'molar_amount', 'mmol/L': 'molar_concentration',
+}
+
+# Conversion factors to base unit within each dimension
+UNIT_TO_BASE: dict[str, tuple[str, float]] = {
+    # Mass -> kg
+    'kg': ('kg', 1.0), 'g': ('kg', 0.001), 'mg': ('kg', 1e-6),
+    'mcg': ('kg', 1e-9), 'ug': ('kg', 1e-9),
+    # Volume -> L
+    'L': ('L', 1.0), 'mL': ('L', 0.001), 'dL': ('L', 0.1),
+    # Length -> m
+    'm': ('m', 1.0), 'cm': ('m', 0.01), 'mm': ('m', 0.001),
+    # Time -> sec
+    'hr': ('sec', 3600.0), 'min': ('sec', 60.0), 'sec': ('sec', 1.0),
+}
+
+
+class SilkUnit:
+    """
+    A numeric value with a physical unit attached.
+
+    Prevents dangerous unit mismatches in medical calculations:
+        10.mg + 5.mL  -> ERROR (mass + volume)
+        10.mg + 5.g   -> 5010.mg (auto-converted)
+
+    Usage in Silk:
+        let dose = unit(500, "mg")
+        let weight = unit(70, "kg")
+        let per_kg = dose / weight   // -> unit(7.14, "mg/kg")
+    """
+
+    def __init__(
+        self,
+        value: 'int | float | SilkDecimal',
+        unit_name: str,
+    ):
+        if unit_name not in UNIT_DIMENSIONS:
+            raise RuntimeError_(
+                f"Unknown unit: '{unit_name}'. "
+                f"Supported: {', '.join(sorted(UNIT_DIMENSIONS.keys()))}"
+            )
+        if isinstance(value, SilkDecimal):
+            self._value = float(value.raw)
+        else:
+            self._value = float(value)
+        self._unit = unit_name
+
+    @property
+    def value(self) -> float:
+        return self._value
+
+    @property
+    def unit(self) -> str:
+        return self._unit
+
+    @property
+    def dimension(self) -> str:
+        return UNIT_DIMENSIONS[self._unit]
+
+    def _check_compatible(self, other: 'SilkUnit', op: str) -> None:
+        """Raise error if units are incompatible for addition/subtraction."""
+        if self.dimension != other.dimension:
+            raise RuntimeError_(
+                f"Unit mismatch: cannot {op} '{self._unit}' and '{other._unit}' "
+                f"({self.dimension} vs {other.dimension})"
+            )
+
+    def _convert_to_same_unit(self, other: 'SilkUnit') -> tuple[float, float, str]:
+        """Convert both values to the same unit (self's unit)."""
+        if self._unit == other._unit:
+            return self._value, other._value, self._unit
+
+        if self._unit in UNIT_TO_BASE and other._unit in UNIT_TO_BASE:
+            self_base, self_factor = UNIT_TO_BASE[self._unit]
+            other_base, other_factor = UNIT_TO_BASE[other._unit]
+            converted = round(other._value * (other_factor / self_factor), 10)
+            return self._value, converted, self._unit
+
+        raise RuntimeError_(
+            f"Cannot auto-convert between '{other._unit}' and '{self._unit}'"
+        )
+
+    def __add__(self, other: object) -> 'SilkUnit':
+        if isinstance(other, SilkUnit):
+            self._check_compatible(other, 'add')
+            a, b, u = self._convert_to_same_unit(other)
+            return SilkUnit(a + b, u)
+        if isinstance(other, (int, float)):
+            return SilkUnit(self._value + other, self._unit)
+        return NotImplemented
+
+    def __radd__(self, other: object) -> 'SilkUnit':
+        if isinstance(other, (int, float)):
+            return SilkUnit(other + self._value, self._unit)
+        return NotImplemented
+
+    def __sub__(self, other: object) -> 'SilkUnit':
+        if isinstance(other, SilkUnit):
+            self._check_compatible(other, 'subtract')
+            a, b, u = self._convert_to_same_unit(other)
+            return SilkUnit(a - b, u)
+        if isinstance(other, (int, float)):
+            return SilkUnit(self._value - other, self._unit)
+        return NotImplemented
+
+    def __mul__(self, other: object) -> 'SilkUnit':
+        if isinstance(other, (int, float)):
+            return SilkUnit(self._value * other, self._unit)
+        if isinstance(other, SilkUnit):
+            raise RuntimeError_(
+                f"Cannot multiply '{self._unit}' by '{other._unit}' directly. "
+                "Use .value to extract the number first."
+            )
+        return NotImplemented
+
+    def __rmul__(self, other: object) -> 'SilkUnit':
+        if isinstance(other, (int, float)):
+            return SilkUnit(other * self._value, self._unit)
+        return NotImplemented
+
+    def __truediv__(self, other: object) -> 'SilkUnit':
+        if isinstance(other, (int, float)):
+            if other == 0:
+                raise RuntimeError_("Division by zero")
+            return SilkUnit(self._value / other, self._unit)
+        if isinstance(other, SilkUnit):
+            if other._value == 0:
+                raise RuntimeError_("Division by zero")
+            if self.dimension == other.dimension:
+                a, b, _ = self._convert_to_same_unit(other)
+                return a / b
+            compound = f"{self._unit}/{other._unit}"
+            if compound in UNIT_DIMENSIONS:
+                return SilkUnit(self._value / other._value, compound)
+            return self._value / other._value
+        return NotImplemented
+
+    def __neg__(self) -> 'SilkUnit':
+        return SilkUnit(-self._value, self._unit)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SilkUnit):
+            if self.dimension != other.dimension:
+                return False
+            a, b, _ = self._convert_to_same_unit(other)
+            return abs(a - b) < 1e-10
+        return False
+
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, SilkUnit):
+            self._check_compatible(other, 'compare')
+            a, b, _ = self._convert_to_same_unit(other)
+            return a < b
+        return NotImplemented
+
+    def __le__(self, other: object) -> bool:
+        if isinstance(other, SilkUnit):
+            self._check_compatible(other, 'compare')
+            a, b, _ = self._convert_to_same_unit(other)
+            return a <= b
+        return NotImplemented
+
+    def __gt__(self, other: object) -> bool:
+        if isinstance(other, SilkUnit):
+            self._check_compatible(other, 'compare')
+            a, b, _ = self._convert_to_same_unit(other)
+            return a > b
+        return NotImplemented
+
+    def __ge__(self, other: object) -> bool:
+        if isinstance(other, SilkUnit):
+            self._check_compatible(other, 'compare')
+            a, b, _ = self._convert_to_same_unit(other)
+            return a >= b
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash((self._value, self._unit))
+
+    def __repr__(self) -> str:
+        if self._value == int(self._value):
+            return f"{int(self._value)} {self._unit}"
+        return f"{self._value} {self._unit}"
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def convert_to(self, target_unit: str) -> 'SilkUnit':
+        """Convert to another unit in the same dimension."""
+        if target_unit not in UNIT_DIMENSIONS:
+            raise RuntimeError_(f"Unknown unit: '{target_unit}'")
+        if UNIT_DIMENSIONS[target_unit] != self.dimension:
+            raise RuntimeError_(
+                f"Cannot convert '{self._unit}' to '{target_unit}': "
+                f"different dimensions ({self.dimension} vs {UNIT_DIMENSIONS[target_unit]})"
+            )
+        if self._unit == target_unit:
+            return SilkUnit(self._value, target_unit)
+
+        if self._unit in UNIT_TO_BASE and target_unit in UNIT_TO_BASE:
+            _, self_factor = UNIT_TO_BASE[self._unit]
+            _, target_factor = UNIT_TO_BASE[target_unit]
+            converted = self._value * (self_factor / target_factor)
+            rounded = round(converted, 10)
+            if rounded == int(rounded):
+                rounded = int(rounded)
+            return SilkUnit(rounded, target_unit)
+
+        raise RuntimeError_(
+            f"No conversion path from '{self._unit}' to '{target_unit}'"
+        )
+
+
 def truthy(value: Any) -> bool:
     """Check if value is truthy."""
     if value is None:
