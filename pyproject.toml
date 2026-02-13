@@ -38,9 +38,13 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
+lsp = [
+    "pygls>=2.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "pygls>=2.0",
 ]
 
 [project.urls]
@@ -51,6 +55,7 @@ Issues = "https://github.com/TemurTurayev/silk-lang/issues"
 
 [project.scripts]
 silk = "silk.cli:main"
+silk-lsp = "silk.lsp.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/silk"]

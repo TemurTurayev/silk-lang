@@ -23,6 +23,13 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# VS Code Extension
+vscode-silk/node_modules/
+vscode-silk/out/
+
+# Claude
+.claude/
+
 # Environment
 .env
 .venv/

@@ -355,16 +355,24 @@ stdev([2, 4, 6, 8])                  // 2.58
 
 ## VS Code Extension
 
-The `vscode-silk/` directory contains a VS Code extension with syntax highlighting:
+The `vscode-silk/` directory contains a VS Code extension with full language support:
 
 ```bash
+# Install the extension
 cd vscode-silk
-# Install in VS Code
+npm install && npm run compile
 code --install-extension .
+
+# Install the language server
+pip install silk-lang[lsp]
 ```
 
 Features:
-- Syntax highlighting for all keywords, operators, and built-in functions
+- **Syntax highlighting** for all keywords, operators, and built-in functions
+- **Real-time diagnostics** — syntax and parse errors as you type
+- **Autocompletion** — keywords, builtins, and all 25 medical functions
+- **Hover documentation** — signatures, formulas, and medical disclaimers
+- **Document symbols** — outline view for functions, structs, enums, tests
 - f-string interpolation highlighting
 - Auto-closing pairs for brackets, quotes, and braces
 - Comment toggling (`//` and `/* */`)
@@ -387,7 +395,7 @@ See the `examples/` directory:
 ## Requirements
 
 - Python 3.11+
-- Zero external dependencies
+- Zero external dependencies (LSP server requires `pygls` — installed via `pip install silk-lang[lsp]`)
 
 ## License
 
