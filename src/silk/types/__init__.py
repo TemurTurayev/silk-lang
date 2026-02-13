@@ -1,10 +1,12 @@
 """
 Silk Runtime Types
 
-Environment, struct instances, enum values, Option/Result types, and helpers.
+Environment, struct instances, enum values, Option/Result types,
+decimal type for precise medical calculations, and helpers.
 """
 
 from typing import Any
+from decimal import Decimal as PyDecimal, InvalidOperation, ROUND_HALF_UP
 from ..builtins.core import silk_repr
 from ..errors import RuntimeError_
 
@@ -155,6 +157,178 @@ class SilkResult:
 
 
 # ═══════════════════════════════════════════════════════════
+# DECIMAL TYPE (precise medical calculations)
+# ═══════════════════════════════════════════════════════════
+
+class SilkDecimal:
+    """
+    Exact decimal arithmetic for medical dosing.
+
+    Unlike float (0.1 + 0.2 != 0.3), SilkDecimal guarantees
+    exact decimal results — critical for drug dosing calculations.
+
+    Usage in Silk:
+        let dose = decimal("0.1")
+        let total = dose + decimal("0.2")   // exactly 0.3
+        let mg = decimal(15) * decimal("0.5")  // exactly 7.5
+    """
+
+    def __init__(self, value: 'str | int | float | PyDecimal | SilkDecimal'):
+        if isinstance(value, SilkDecimal):
+            self._value = value._value
+        elif isinstance(value, PyDecimal):
+            self._value = value
+        elif isinstance(value, str):
+            try:
+                self._value = PyDecimal(value)
+            except InvalidOperation:
+                raise RuntimeError_(f"Invalid decimal value: '{value}'")
+        elif isinstance(value, int):
+            self._value = PyDecimal(value)
+        elif isinstance(value, float):
+            self._value = PyDecimal(str(value))
+        else:
+            raise RuntimeError_(
+                f"Cannot create decimal from {type(value).__name__}"
+            )
+
+    @property
+    def raw(self) -> PyDecimal:
+        """Access underlying Python Decimal."""
+        return self._value
+
+    def __add__(self, other: object) -> 'SilkDecimal':
+        if isinstance(other, SilkDecimal):
+            return SilkDecimal(self._value + other._value)
+        if isinstance(other, (int, float)):
+            return SilkDecimal(self._value + PyDecimal(str(other)))
+        return NotImplemented
+
+    def __radd__(self, other: object) -> 'SilkDecimal':
+        return self.__add__(other)
+
+    def __sub__(self, other: object) -> 'SilkDecimal':
+        if isinstance(other, SilkDecimal):
+            return SilkDecimal(self._value - other._value)
+        if isinstance(other, (int, float)):
+            return SilkDecimal(self._value - PyDecimal(str(other)))
+        return NotImplemented
+
+    def __rsub__(self, other: object) -> 'SilkDecimal':
+        if isinstance(other, (int, float)):
+            return SilkDecimal(PyDecimal(str(other)) - self._value)
+        return NotImplemented
+
+    def __mul__(self, other: object) -> 'SilkDecimal':
+        if isinstance(other, SilkDecimal):
+            return SilkDecimal(self._value * other._value)
+        if isinstance(other, (int, float)):
+            return SilkDecimal(self._value * PyDecimal(str(other)))
+        return NotImplemented
+
+    def __rmul__(self, other: object) -> 'SilkDecimal':
+        return self.__mul__(other)
+
+    def __truediv__(self, other: object) -> 'SilkDecimal':
+        other_val = None
+        if isinstance(other, SilkDecimal):
+            other_val = other._value
+        elif isinstance(other, (int, float)):
+            other_val = PyDecimal(str(other))
+        else:
+            return NotImplemented
+        if other_val == 0:
+            raise RuntimeError_("Division by zero")
+        return SilkDecimal(self._value / other_val)
+
+    def __rtruediv__(self, other: object) -> 'SilkDecimal':
+        if isinstance(other, (int, float)):
+            if self._value == 0:
+                raise RuntimeError_("Division by zero")
+            return SilkDecimal(PyDecimal(str(other)) / self._value)
+        return NotImplemented
+
+    def __mod__(self, other: object) -> 'SilkDecimal':
+        if isinstance(other, SilkDecimal):
+            return SilkDecimal(self._value % other._value)
+        if isinstance(other, (int, float)):
+            return SilkDecimal(self._value % PyDecimal(str(other)))
+        return NotImplemented
+
+    def __pow__(self, other: object) -> 'SilkDecimal':
+        if isinstance(other, SilkDecimal):
+            return SilkDecimal(self._value ** other._value)
+        if isinstance(other, (int, float)):
+            return SilkDecimal(self._value ** PyDecimal(str(other)))
+        return NotImplemented
+
+    def __neg__(self) -> 'SilkDecimal':
+        return SilkDecimal(-self._value)
+
+    def __abs__(self) -> 'SilkDecimal':
+        return SilkDecimal(abs(self._value))
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SilkDecimal):
+            return self._value == other._value
+        if isinstance(other, (int, float)):
+            return self._value == PyDecimal(str(other))
+        return False
+
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, SilkDecimal):
+            return self._value < other._value
+        if isinstance(other, (int, float)):
+            return self._value < PyDecimal(str(other))
+        return NotImplemented
+
+    def __le__(self, other: object) -> bool:
+        if isinstance(other, SilkDecimal):
+            return self._value <= other._value
+        if isinstance(other, (int, float)):
+            return self._value <= PyDecimal(str(other))
+        return NotImplemented
+
+    def __gt__(self, other: object) -> bool:
+        if isinstance(other, SilkDecimal):
+            return self._value > other._value
+        if isinstance(other, (int, float)):
+            return self._value > PyDecimal(str(other))
+        return NotImplemented
+
+    def __ge__(self, other: object) -> bool:
+        if isinstance(other, SilkDecimal):
+            return self._value >= other._value
+        if isinstance(other, (int, float)):
+            return self._value >= PyDecimal(str(other))
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self._value)
+
+    def __repr__(self) -> str:
+        return f"decimal({self._value})"
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+    def to_int(self) -> int:
+        """Convert to int, truncating toward zero."""
+        return int(self._value)
+
+    def to_float(self) -> float:
+        """Convert to float (may lose precision)."""
+        return float(self._value)
+
+    def round(self, places: int = 0) -> 'SilkDecimal':
+        """Round to given decimal places using ROUND_HALF_UP."""
+        quantize_str = '0.' + '0' * places if places > 0 else '1'
+        return SilkDecimal(
+            self._value.quantize(PyDecimal(quantize_str), rounding=ROUND_HALF_UP)
+        )
+
+
+# ═══════════════════════════════════════════════════════════
 # HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════
 
@@ -164,6 +338,8 @@ def truthy(value: Any) -> bool:
         return False
     if isinstance(value, bool):
         return value
+    if isinstance(value, SilkDecimal):
+        return value.raw != 0
     if isinstance(value, (int, float)):
         return value != 0
     if isinstance(value, str):

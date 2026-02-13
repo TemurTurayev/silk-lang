@@ -14,6 +14,9 @@ def silk_repr(value: Any) -> str:
         return "null"
     if isinstance(value, bool):
         return "true" if value else "false"
+    # SilkDecimal (duck-typed to avoid circular import)
+    if hasattr(value, 'raw') and hasattr(value, 'round') and not isinstance(value, type):
+        return str(value.raw)
     if isinstance(value, float):
         if value == int(value):
             return str(int(value))
@@ -82,6 +85,9 @@ def builtin_type(args: list, context: dict) -> str:
         return "int"
     elif isinstance(v, float):
         return "float"
+    # SilkDecimal (duck-typed to avoid circular import)
+    elif hasattr(v, 'raw') and hasattr(v, 'round') and not isinstance(v, type):
+        return "decimal"
     elif isinstance(v, str):
         return "str"
     elif isinstance(v, list):
@@ -102,12 +108,18 @@ def builtin_str(args: list, context: dict) -> str:
 
 def builtin_int(args: list, context: dict) -> int:
     """Convert value to integer."""
-    return int(args[0])
+    v = args[0]
+    if hasattr(v, 'to_int'):
+        return v.to_int()
+    return int(v)
 
 
 def builtin_float(args: list, context: dict) -> float:
     """Convert value to float."""
-    return float(args[0])
+    v = args[0]
+    if hasattr(v, 'to_float'):
+        return v.to_float()
+    return float(v)
 
 
 def builtin_bool(args: list, context: dict) -> bool:
@@ -250,6 +262,19 @@ def builtin_err(args: list, context: dict) -> Any:
     return SilkResult(error=args[0], is_ok=False)
 
 
+def builtin_decimal(args: list, context: dict) -> Any:
+    """Create a precise decimal value for medical calculations.
+
+    decimal("0.1")     -> exact 0.1 (no float rounding)
+    decimal(15)        -> exact 15
+    decimal(3.14)      -> exact 3.14 (from string repr)
+    """
+    from ..types import SilkDecimal
+    if len(args) != 1:
+        raise RuntimeError_("decimal() takes exactly 1 argument")
+    return SilkDecimal(args[0])
+
+
 def builtin_reduce(args: list, context: dict) -> Any:
     """Reduce an array: reduce(arr, fn(acc, item), initial)."""
     arr, func, initial = args[0], args[1], args[2]
@@ -276,6 +301,7 @@ CORE_BUILTINS: dict[str, Callable] = {
     'str': builtin_str,
     'int': builtin_int,
     'float': builtin_float,
+    'decimal': builtin_decimal,
     'bool': builtin_bool,
     'len': builtin_len,
     'range': builtin_range,

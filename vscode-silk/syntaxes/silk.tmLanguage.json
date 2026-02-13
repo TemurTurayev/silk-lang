@@ -198,7 +198,7 @@
       "patterns": [
         {
           "name": "support.type.silk",
-          "match": "\\b(int|float|str|bool|array|map|Option|Result)\\b"
+          "match": "\\b(int|float|decimal|str|bool|array|map|Option|Result)\\b"
         }
       ]
     },
@@ -218,7 +218,7 @@
         },
         {
           "name": "support.function.builtin.silk",
-          "match": "\\b(print|input|type|typeof|str|int|float|bool|len|range|push|pop|shift|unshift|slice|reverse|sort|join|split|contains|indexOf|map|filter|find|reduce|forEach|zip|flatten)\\b"
+          "match": "\\b(print|input|type|typeof|str|int|float|decimal|bool|len|range|push|pop|shift|unshift|slice|reverse|sort|join|split|contains|indexOf|map|filter|find|reduce|forEach|zip|flatten)\\b"
         },
         {
           "name": "support.function.math.silk",

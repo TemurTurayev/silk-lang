@@ -32,7 +32,7 @@ from .builtins.core import silk_repr
 from .resolver import ModuleResolver, ModuleNotFoundError as ResolverNotFound
 from .types import (
     Environment, SilkStruct, SilkEnumValue, SilkOption, SilkResult,
-    truthy, multiply, divide
+    SilkDecimal, truthy, multiply, divide
 )
 from .interpreter_members import MemberMixin
 
